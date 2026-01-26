@@ -1,0 +1,44 @@
+version: '3.9'
+
+services:
+
+  db:
+    image: postgres:15
+    container_name: wrenchit-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0.1
+    container_name: wrenchit-keycloak
+    command: start-dev --import-realm
+    environment:
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://db:5432/${POSTGRES_DB}
+      KC_DB_USERNAME: ${POSTGRES_USER}
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+    volumes:
+      - ./docker/keycloak:/opt/keycloak/data/import
+
+  clamav:
+    image: mkodockx/docker-clamav:alpine
+    container_name: wrenchit-clamav
+    ports:
+      - "${CLAMAV_PORT}:3310"
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
