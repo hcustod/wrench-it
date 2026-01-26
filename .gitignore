@@ -1,0 +1,185 @@
+############################
+# Project / Docs
+############################
+HELP.md
+
+############################
+# OS / System junk
+############################
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+############################
+# Temporary / swap files
+############################
+*.swp
+*.swo
+*.bak
+*.tmp
+*.temp
+
+############################
+# Java / JVM artifacts
+############################
+*.class
+*.log
+*.ctxt
+
+############################
+# Maven
+############################
+target/
+.mvn/wrapper/maven-wrapper.jar
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+
+# Keep generated test/build targets if explicitly needed
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+############################
+# Gradle
+############################
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+############################
+# Spring Boot
+############################
+application-*.yml
+application-*.yaml
+application-*.properties
+bootstrap-*.yml
+bootstrap-*.yaml
+bootstrap-*.properties
+
+############################
+# Environment / Secrets (STRICT)
+############################
+.env
+.env.*
+*.env
+*.pem
+*.key
+*.crt
+*.p12
+*.jks
+secrets/
+config/secrets/
+**/secrets/**
+**/*secret*
+**/*password*
+**/*token*
+**/*credentials*
+**/*private*
+
+############################
+# Docker / Compose / Volumes
+############################
+docker-data/
+docker-volumes/
+postgres-data/
+pgdata/
+keycloak-data/
+clamav-data/
+minio-data/
+**/data/
+**/volumes/
+docker-compose.override.yml
+
+############################
+# Logs
+############################
+logs/
+*.log
+*.trace
+*.out
+
+############################
+# Test / Coverage / Reports
+############################
+coverage/
+*.exec
+*.lcov
+test-output/
+surefire-reports/
+failsafe-reports/
+
+############################
+# Temporary / Runtime / Uploads
+############################
+tmp/
+temp/
+uploads/
+.cache/
+.work/
+.run/
+
+############################
+# Node / Frontend (if present)
+############################
+node_modules/
+dist/
+.npm/
+.pnpm-store/
+.yarn/
+.yarn-cache/
+yarn-error.log
+npm-debug.log*
+pnpm-debug.log*
+
+############################
+# STS (Spring Tool Suite)
+############################
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+############################
+# IntelliJ IDEA
+############################
+.idea/
+.idea/**/*
+*.iws
+*.iml
+*.ipr
+
+############################
+# NetBeans
+############################
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+############################
+# VS Code
+############################
+.vscode/
+
+############################
+# CI / Tooling
+############################
+*.pid
+*.seed
+*.pid.lock
