@@ -39,6 +39,48 @@ services:
       timeout: 3s
       retries: 15
 
+  # Keycloak DB
+  db_keycloak:
+    image: postgres:15
+    container_name: wrenchit-postgres-keycloak
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_KC_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_KC_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_KC_DB}
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_kc_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_KC_USER} -d ${POSTGRES_KC_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:25.0
+    container_name: wrenchit-keycloak
+    depends_on:
+      db_keycloak:
+        condition: service_healthy
+    environment:
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://db_keycloak:5432/${POSTGRES_KC_DB}
+      KC_DB_USERNAME: ${POSTGRES_KC_USER}
+      KC_DB_PASSWORD: ${POSTGRES_KC_PASSWORD}
+
+      # lets services call it as http://keycloak:8080 inside the compose network
+      KC_HOSTNAME_STRICT: "false"
+      KC_HTTP_ENABLED: "true"
+    ports:
+      - "8082:8080"
+    command: ["start-dev"]
+    restart: unless-stopped
+
   clamav:
     image: mkodockx/docker-clamav:alpine
     container_name: wrenchit-clamav
@@ -49,3 +91,4 @@ services:
 volumes:
   postgres_auth_data:
   postgres_app_data:
+  postgres_kc_data:

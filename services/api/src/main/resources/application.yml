@@ -1,0 +1,15 @@
+server:
+  port: 8080
+
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8082/realms/wrenchit
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
