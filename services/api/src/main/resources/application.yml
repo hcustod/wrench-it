@@ -13,3 +13,18 @@ management:
     web:
       exposure:
         include: health,info
+
+datasource:
+  url: jdbc:postgresql://localhost:5432/wrenchit
+  username: wrenchit
+  password: wrenchit
+
+jpa:
+  hibernate:
+    ddl-auto: validate
+  properties:
+    hibernate:
+      format_sql: true
+
+flyway:
+  enabled: true
