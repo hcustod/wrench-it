@@ -5,14 +5,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.wrenchit.api.entity.User;
-import com.wrenchit.api.repository.UserRepository;
+import com.wrenchit.api.repository.UserRepo;
 
 @Service
 public class UserService {
 
-    private final UserRepository userRepository;
+    private final UserRepo userRepository;
 
-    public UserService(UserRepository userRepository) {
+    public UserService(UserRepo userRepository) {
         this.userRepository = userRepository;
     }
 

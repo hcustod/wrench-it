@@ -32,6 +32,9 @@
     <modules>
         <module>main</module>
         <module>services/auth</module>
+        <module>services/api</module>
+        <module>services/stores</module>
+        <module>services/engagement</module>
     </modules>
 
     <build>

@@ -2,11 +2,26 @@ server:
   port: 8080
 
 spring:
+  application:
+    name: service-api
   security:
     oauth2:
       resourceserver:
         jwt:
           issuer-uri: http://localhost:8082/realms/wrenchit
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_APP_HOST:localhost}:${POSTGRES_APP_PORT:5432}/${POSTGRES_APP_DB:wrenchit_app}
+    username: ${POSTGRES_APP_USER:wrenchit_app_user}
+    password: ${POSTGRES_APP_PASSWORD:wrenchitApp123}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: true
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
 
 management:
   endpoints:
@@ -14,17 +29,7 @@ management:
       exposure:
         include: health,info
 
-datasource:
-  url: jdbc:postgresql://localhost:5432/wrenchit
-  username: wrenchit
-  password: wrenchit
-
-jpa:
-  hibernate:
-    ddl-auto: validate
-  properties:
-    hibernate:
-      format_sql: true
-
-flyway:
-  enabled: true
+wrenchit:
+  google:
+    enabled: false
+    api-key: ${GOOGLE_PLACES_API_KEY:}

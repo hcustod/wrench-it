@@ -42,4 +42,47 @@ public class User {
         updatedAt = OffsetDateTime.now();
     }
 
+    public UUID getId() {
+        return id;
+    }
+
+    public String getKeycloakSub() {
+        return keycloakSub;
+    }
+
+    public void setKeycloakSub(String keycloakSub) {
+        this.keycloakSub = keycloakSub;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public String getDisplayName() {
+        return displayName;
+    }
+
+    public void setDisplayName(String displayName) {
+        this.displayName = displayName;
+    }
+
+    public String getRole() {
+        return role;
+    }
+
+    public void setRole(String role) {
+        this.role = role;
+    }
+
+    public OffsetDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public OffsetDateTime getUpdatedAt() {
+        return updatedAt;
+    }
 }
