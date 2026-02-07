@@ -88,6 +88,15 @@ services:
       - "${CLAMAV_PORT:-3310}:3310"
     restart: unless-stopped
 
+  www:
+    build:
+      context: ./www
+    container_name: wrenchit-www
+    ports:
+      - "8081:80"
+    depends_on:
+      - api
+
 volumes:
   postgres_auth_data:
   postgres_app_data:

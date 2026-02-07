@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>WrenchIT Demo</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+
+<body x-data="app()" x-init="init()">
+  <header class="topbar">
+    <div class="brand">WrenchIT</div>
+    <div class="right">
+      <button class="btn ghost" @click="ping()" :disabled="pinging">
+        <span x-show="!pinging">Ping API</span>
+        <span x-show="pinging">Pinging...</span>
+      </button>
+      <span class="pill" x-text="apiOk ? 'API OK' : 'API ?'"></span>
+    </div>
+  </header>
+
+  <main class="shell">
+    <section class="panel">
+      <div class="row">
+        <input class="input" placeholder="Search stores..." x-model="q" @keydown.enter.prevent="search()" />
+        <button class="btn" @click="search()" :disabled="loading">
+          <span x-show="!loading">Search</span>
+          <span x-show="loading">Searching...</span>
+        </button>
+      </div>
+
+      <template x-if="error">
+        <div class="error" x-text="error"></div>
+      </template>
+
+      <div class="results">
+        <template x-for="s in results" :key="s.id || s.placeId || s.name">
+          <button class="card" @click="selected = s">
+            <div class="card-title">
+              <span x-text="s.name ?? 'Store'"></span>
+              <span class="badge" x-show="s.distanceKm != null" x-text="`${Number(s.distanceKm).toFixed(1)} km`"></span>
+            </div>
+            <div class="card-sub" x-text="formatLoc(s)"></div>
+          </button>
+        </template>
+
+        <div class="empty" x-show="!loading && results.length === 0">
+          No results yet.
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="sectionTitle">Selected</div>
+      <template x-if="selected">
+        <pre class="code" x-text="JSON.stringify(selected, null, 2)"></pre>
+      </template>
+      <div class="empty" x-show="!selected">
+        Click a store to preview JSON.
+      </div>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>
