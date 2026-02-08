@@ -1,0 +1,46 @@
+insert into stores (
+    google_place_id,
+    name,
+    address,
+    city,
+    state,
+    postal_code,
+    country,
+    lat,
+    lng,
+    rating,
+    rating_count,
+    phone,
+    website,
+    services_text
+)
+values
+    ('demo-hartford-001', 'Capital City Auto Care', '1200 Main St', 'Hartford', 'CT', '06103', 'US', 41.7640, -72.6827, 4.6, 128, '(860) 555-1101', 'https://capitalcityautocare.example', 'Oil change, brakes, tires, engine diagnostics'),
+    ('demo-boston-001', 'North End Auto Works', '245 Hanover St', 'Boston', 'MA', '02113', 'US', 42.3636, -71.0546, 4.5, 94, '(617) 555-2202', 'https://northendautoworks.example', 'A/C service, alignment, inspections'),
+    ('demo-nyc-001', 'Queens Performance Garage', '8802 Queens Blvd', 'Queens', 'NY', '11373', 'US', 40.7365, -73.8770, 4.4, 211, '(718) 555-3303', 'https://queensperformance.example', 'Brakes, suspension, engine repair'),
+    ('demo-philly-001', 'Liberty Auto Service', '1035 Arch St', 'Philadelphia', 'PA', '19107', 'US', 39.9549, -75.1596, 4.3, 76, '(215) 555-4404', 'https://libertyautoservice.example', 'Oil change, battery, electrical diagnostics'),
+    ('demo-atlanta-001', 'Peachtree Mechanic Center', '180 Peachtree St NE', 'Atlanta', 'GA', '30303', 'US', 33.7584, -84.3877, 4.7, 159, '(404) 555-5505', 'https://peachtreemechanic.example', 'Transmission, brakes, cooling system'),
+    ('demo-miami-001', 'Biscayne Auto Clinic', '250 Biscayne Blvd', 'Miami', 'FL', '33132', 'US', 25.7773, -80.1868, 4.2, 81, '(305) 555-6606', 'https://biscayneautoclinic.example', 'A/C repair, tune-ups, tires'),
+    ('demo-chicago-001', 'Lakeview Auto & Tire', '3120 N Broadway', 'Chicago', 'IL', '60657', 'US', 41.9399, -87.6442, 4.6, 133, '(312) 555-7707', 'https://lakeviewauto.example', 'Tires, wheel alignment, brakes'),
+    ('demo-denver-001', 'Mile High Garage', '1644 Champa St', 'Denver', 'CO', '80202', 'US', 39.7487, -104.9950, 4.5, 101, '(303) 555-8808', 'https://milehighgarage.example', 'Engine diagnostics, emissions, suspension'),
+    ('demo-dallas-001', 'Lone Star Auto Hub', '1401 Elm St', 'Dallas', 'TX', '75201', 'US', 32.7814, -96.7990, 4.4, 118, '(214) 555-9909', 'https://lonestarautohub.example', 'Oil change, state inspection, brake service'),
+    ('demo-phoenix-001', 'Desert Auto Repair', '210 E Washington St', 'Phoenix', 'AZ', '85004', 'US', 33.4486, -112.0703, 4.3, 87, '(602) 555-1010', 'https://desertautorepair.example', 'Cooling systems, batteries, alternators'),
+    ('demo-seattle-001', 'Puget Sound Auto Shop', '700 5th Ave', 'Seattle', 'WA', '98104', 'US', 47.6056, -122.3325, 4.6, 140, '(206) 555-1112', 'https://pugetsoundauto.example', 'Hybrid service, brakes, diagnostics'),
+    ('demo-la-001', 'Sunset Boulevard Auto', '8200 Sunset Blvd', 'Los Angeles', 'CA', '90046', 'US', 34.0977, -118.3658, 4.5, 174, '(323) 555-1213', 'https://sunsetboulevardauto.example', 'Oil change, transmission, tune-up'),
+    ('demo-sf-001', 'Bay Area Auto Collective', '1250 Market St', 'San Francisco', 'CA', '94102', 'US', 37.7763, -122.4178, 4.7, 162, '(415) 555-1415', 'https://bayareaautocollective.example', 'EV service, suspension, tire rotation')
+on conflict (google_place_id) do update
+set
+    name = excluded.name,
+    address = excluded.address,
+    city = excluded.city,
+    state = excluded.state,
+    postal_code = excluded.postal_code,
+    country = excluded.country,
+    lat = excluded.lat,
+    lng = excluded.lng,
+    rating = excluded.rating,
+    rating_count = excluded.rating_count,
+    phone = excluded.phone,
+    website = excluded.website,
+    services_text = excluded.services_text,
+    updated_at = now();

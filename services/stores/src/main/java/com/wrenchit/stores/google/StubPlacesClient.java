@@ -2,14 +2,14 @@ package com.wrenchit.stores.google;
 
 import java.util.List;
 
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import com.wrenchit.stores.dto.PlaceDetails;
 import com.wrenchit.stores.dto.PlaceSearchResult;
 
 @Component
-@ConditionalOnMissingBean(PlacesClient.class)
+@ConditionalOnProperty(prefix = "wrenchit.google", name = "enabled", havingValue = "false", matchIfMissing = true)
 public class StubPlacesClient implements PlacesClient {
 
     @Override

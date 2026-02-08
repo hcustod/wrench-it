@@ -45,7 +45,7 @@ public class StoreController {
     }
 
     @GetMapping("/search")
-    public StoreSearchResponse search(@RequestParam("q") String query,
+    public StoreSearchResponse search(@RequestParam(value = "q", required = false) String query,
                                       @RequestParam(value = "limit", defaultValue = "20") int limit,
                                       @RequestParam(value = "offset", defaultValue = "0") int offset,
                                       @RequestParam(value = "sort", defaultValue = "RATING") StoreSort sort,

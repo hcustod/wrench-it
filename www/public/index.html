@@ -5,6 +5,11 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>WrenchIT Demo</title>
   <link rel="stylesheet" href="/styles.css" />
+  <script>
+    window.WRENCHIT_CONFIG = {
+      googleMapsApiKey: "",
+    };
+  </script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </head>
 
@@ -22,26 +27,44 @@
 
   <main class="shell">
     <section class="panel">
-      <div class="row">
-        <input class="input" placeholder="Search stores..." x-model="q" @keydown.enter.prevent="search()" />
+      <div class="row controls">
+        <input class="input" placeholder="Search stores (e.g., brakes, oil change, mechanic)..." x-model="q" @keydown.enter.prevent="search()" />
         <button class="btn" @click="search()" :disabled="loading">
           <span x-show="!loading">Search</span>
           <span x-show="loading">Searching...</span>
         </button>
       </div>
 
+      <div class="row controls">
+        <button class="btn ghost" @click="useMyLocation()" :disabled="locating">
+          <span x-show="!locating">Use My Location</span>
+          <span x-show="locating">Locating...</span>
+        </button>
+        <label class="inlineField">
+          <span>Radius (km)</span>
+          <input class="input compact" type="number" min="1" max="500" step="1" x-model.number="radiusKm" />
+        </label>
+      </div>
+
       <template x-if="error">
         <div class="error" x-text="error"></div>
       </template>
 
+      <template x-if="notice">
+        <div class="notice" x-text="notice"></div>
+      </template>
+
       <div class="results">
         <template x-for="s in results" :key="s.id || s.placeId || s.name">
-          <button class="card" @click="selected = s">
+          <button class="card" @click="selectStore(s)" :class="{ active: selected && (selected.id || selected.placeId) === (s.id || s.placeId) }">
             <div class="card-title">
               <span x-text="s.name ?? 'Store'"></span>
               <span class="badge" x-show="s.distanceKm != null" x-text="`${Number(s.distanceKm).toFixed(1)} km`"></span>
             </div>
             <div class="card-sub" x-text="formatLoc(s)"></div>
+            <div class="card-meta">
+              <span x-show="s.rating != null" x-text="`Rating: ${Number(s.rating).toFixed(1)} (${s.ratingCount ?? 0})`"></span>
+            </div>
           </button>
         </template>
 
@@ -52,12 +75,50 @@
     </section>
 
     <section class="panel">
-      <div class="sectionTitle">Selected</div>
-      <template x-if="selected">
-        <pre class="code" x-text="JSON.stringify(selected, null, 2)"></pre>
+      <div class="sectionTitle">Nearby Map</div>
+      <div class="mapWrap">
+        <div id="mapCanvas" class="mapCanvas"></div>
+        <div class="mapOverlay" x-show="mapStatus" x-text="mapStatus"></div>
+      </div>
+
+      <div class="sectionTitle">Store Profile</div>
+      <template x-if="profileLoading">
+        <div class="empty">Loading store profile...</div>
       </template>
-      <div class="empty" x-show="!selected">
-        Click a store to preview JSON.
+
+      <template x-if="profileError">
+        <div class="error" x-text="profileError"></div>
+      </template>
+
+      <template x-if="selectedDetail">
+        <div class="profile">
+          <div class="profile-name" x-text="selectedDetail.name ?? selected.name"></div>
+          <div class="profile-sub" x-text="formatLoc(selectedDetail)"></div>
+          <div class="profile-sub" x-show="selectedDetail.phone" x-text="selectedDetail.phone"></div>
+          <a class="profile-link" x-show="selectedDetail.website" :href="selectedDetail.website" target="_blank" rel="noopener noreferrer">Visit Website</a>
+          <div class="profile-sub" x-show="selectedDetail.servicesText" x-text="selectedDetail.servicesText"></div>
+          <div class="profile-sub" x-show="selectedDetail.rating != null" x-text="`Google Rating: ${Number(selectedDetail.rating).toFixed(1)} (${selectedDetail.ratingCount ?? 0})`"></div>
+
+          <div class="sectionTitle">Reviews</div>
+          <template x-if="reviews.length === 0">
+            <div class="empty">No reviews yet.</div>
+          </template>
+          <div class="reviewList" x-show="reviews.length > 0">
+            <template x-for="r in reviews" :key="r.id">
+              <div class="reviewCard">
+                <div class="reviewTop">
+                  <span x-text="`Rating: ${r.rating}/5`"></span>
+                  <span x-text="formatDate(r.createdAt)"></span>
+                </div>
+                <div class="reviewBody" x-text="r.comment || 'No comment.'"></div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </template>
+
+      <div class="empty" x-show="!selected && !profileLoading">
+        Select a store to see its details and reviews.
       </div>
     </section>
   </main>

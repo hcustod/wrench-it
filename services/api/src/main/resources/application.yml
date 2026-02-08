@@ -30,6 +30,8 @@ management:
         include: health,info
 
 wrenchit:
+  security:
+    auth-enabled: false
   google:
     enabled: false
     api-key: ${GOOGLE_PLACES_API_KEY:}
