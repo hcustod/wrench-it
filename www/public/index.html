@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>WrenchIT Demo</title>
+  <title>WrenchIT Demo | Explore</title>
   <link rel="stylesheet" href="/styles.css" />
   <script>
     window.WRENCHIT_CONFIG = {
@@ -12,12 +12,23 @@
   </script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </head>
+<body data-page="explore" x-data="app()" x-init="initPage('explore')">
+  <header class="topbar appTopbar">
+    <div class="brandBlock">
+      <div class="brand">WrenchIT</div>
+      <div class="brandSub">Marketplace Demo</div>
+    </div>
 
-<body x-data="app()" x-init="init()">
-  <header class="topbar">
-    <div class="brand">WrenchIT</div>
+    <nav class="mainNav" aria-label="Primary">
+      <a class="navBtn" :class="{ active: isPage('explore') }" :aria-current="isPage('explore') ? 'page' : null" href="/index.html">Explore</a>
+      <a class="navBtn" :class="{ active: isPage('compare') }" :aria-current="isPage('compare') ? 'page' : null" href="/compare.html">Compare</a>
+      <a class="navBtn" :class="{ active: isPage('saved') }" :aria-current="isPage('saved') ? 'page' : null" href="/saved.html">Saved</a>
+      <a class="navBtn" :class="{ active: isPage('receipts') }" :aria-current="isPage('receipts') ? 'page' : null" href="/receipts.html">Receipts</a>
+      <a class="navBtn" :class="{ active: isPage('profile') }" :aria-current="isPage('profile') ? 'page' : null" href="/profile.html">Profile</a>
+    </nav>
+
     <div class="right">
-      <button class="btn ghost" @click="ping()" :disabled="pinging">
+      <button class="btn ghost small" @click="ping()" :disabled="pinging">
         <span x-show="!pinging">Ping API</span>
         <span x-show="pinging">Pinging...</span>
       </button>
@@ -26,227 +37,156 @@
     </div>
   </header>
 
-  <main class="shell">
-    <section class="panel">
-      <div class="sectionTitle">Auth + Session</div>
-      <div class="row controls">
-        <input class="input" placeholder="Paste JWT token (optional for local auth-disabled mode)" x-model="authTokenInput" />
-        <button class="btn" @click="saveAuthToken()">Save Token</button>
-        <button class="btn ghost" @click="clearAuthToken()">Clear</button>
-      </div>
-      <div class="row controls">
-        <button class="btn ghost" @click="loadMe()" :disabled="meLoading">
-          <span x-show="!meLoading">Load /api/me</span>
-          <span x-show="meLoading">Loading...</span>
-        </button>
-        <button class="btn ghost" @click="loadSavedShops()" :disabled="savedLoading">
-          <span x-show="!savedLoading">Load My Saved</span>
-          <span x-show="savedLoading">Loading...</span>
-        </button>
-      </div>
-      <div class="card mutedCard" x-show="me">
-        <div class="card-title">
-          <span x-text="me.displayName || me.email || me.keycloakSub || 'User'"></span>
-          <span class="badge" x-text="me.role || 'CUSTOMER'"></span>
+  <main class="pageContainer" :class="{ compact: userSettings?.compactMode }">
+    <section class="pageIntro">
+      <div class="pageHeader">
+        <div class="introText">
+          <h1>Explore Stores</h1>
+          <p>Search nearby shops, inspect live profile details, and post test reviews against the running backend APIs.</p>
         </div>
-        <div class="card-sub" x-text="me.email || '--'"></div>
+        <div class="row controls">
+          <a class="btn ghost" href="/compare.html">Go To Compare</a>
+          <a class="btn ghost" href="/saved.html">Go To Saved</a>
+        </div>
       </div>
-      <div class="empty" x-show="!me && !meLoading">No loaded profile yet.</div>
-      <div class="error" x-show="meError" x-text="meError"></div>
-
-      <div class="sectionTitle">Search</div>
-      <div class="row controls">
-        <input class="input" placeholder="Search stores (e.g., brakes, oil change, mechanic)..." x-model="q" @keydown.enter.prevent="search()" />
-        <button class="btn" @click="search()" :disabled="loading">
-          <span x-show="!loading">Search</span>
-          <span x-show="loading">Searching...</span>
-        </button>
-      </div>
-
-      <div class="row controls">
-        <button class="btn ghost" @click="useMyLocation()" :disabled="locating">
-          <span x-show="!locating">Use My Location</span>
-          <span x-show="locating">Locating...</span>
-        </button>
-        <label class="inlineField">
-          <span>Radius (km)</span>
-          <input class="input compact" type="number" min="1" max="500" step="1" x-model.number="radiusKm" />
-        </label>
-      </div>
-
-      <div class="row controls">
-        <button class="btn ghost" @click="runCompare()" :disabled="compareLoading || compareIds.length < 2">
-          <span x-show="!compareLoading">Compare Selected</span>
-          <span x-show="compareLoading">Comparing...</span>
-        </button>
-        <button class="btn ghost" @click="clearCompare()" :disabled="compareIds.length === 0">Clear Compare</button>
-        <span class="pill" x-text="`${compareIds.length}/4 selected`"></span>
-      </div>
-
-      <template x-if="error">
-        <div class="error" x-text="error"></div>
-      </template>
-
-      <template x-if="notice">
-        <div class="notice" x-text="notice"></div>
-      </template>
-
-      <template x-if="compareError">
-        <div class="error" x-text="compareError"></div>
-      </template>
-
-      <div class="results">
-        <template x-for="s in results" :key="s.id || s.placeId || s.name">
-          <div class="card" @click="selectStore(s)" :class="{ active: isSelectedStore(s) }">
-            <div class="card-title">
-              <span x-text="s.name ?? 'Store'"></span>
-              <span class="badge" x-show="s.distanceKm != null" x-text="`${Number(s.distanceKm).toFixed(1)} km`"></span>
-            </div>
-            <div class="card-sub" x-text="formatLoc(s)"></div>
-            <div class="card-meta">
-              <span x-show="s.rating != null" x-text="`Rating: ${Number(s.rating).toFixed(1)} (${s.ratingCount ?? 0})`"></span>
-            </div>
-            <div class="row cardActions">
-              <button
-                class="btn ghost small"
-                @click.stop="toggleSaved(s)"
-                :disabled="!s.id || isSaveBusy(s.id)">
-                <span x-show="!isSaveBusy(s.id)" x-text="isStoreSaved(s.id) ? 'Unsave' : 'Save'"></span>
-                <span x-show="isSaveBusy(s.id)">Working...</span>
-              </button>
-              <button class="btn ghost small" @click.stop="toggleCompare(s)" :disabled="!s.id">
-                <span x-text="isCompareSelected(s.id) ? 'Remove Compare' : 'Add Compare'"></span>
-              </button>
-            </div>
-          </div>
-        </template>
-
-        <div class="empty" x-show="!loading && results.length === 0">
-          No results yet.
+      <div class="metricRow">
+        <div class="metricCard">
+          <div class="card-sub">Search Results</div>
+          <div class="metricValue" x-text="results.length"></div>
+        </div>
+        <div class="metricCard">
+          <div class="card-sub">Saved Shops</div>
+          <div class="metricValue" x-text="savedShops.length"></div>
+        </div>
+        <div class="metricCard">
+          <div class="card-sub">Compare Queue</div>
+          <div class="metricValue" x-text="compareIds.length"></div>
         </div>
       </div>
     </section>
 
-    <section class="panel">
-      <div class="sectionTitle">Nearby Map</div>
-      <div class="mapWrap">
-        <div id="mapCanvas" class="mapCanvas"></div>
-        <div class="mapOverlay" x-show="mapStatus" x-text="mapStatus"></div>
-      </div>
+    <section class="pageGrid twoCol">
+      <section class="panel">
+        <div class="sectionTitle">Search</div>
+        <div class="row controls">
+          <input class="input" placeholder="Search stores (brakes, oil change, mechanic)..." x-model="q" @keydown.enter.prevent="search()" />
+          <button class="btn" @click="search()" :disabled="loading">
+            <span x-show="!loading">Search</span>
+            <span x-show="loading">Searching...</span>
+          </button>
+        </div>
 
-      <div class="sectionTitle">Compare Results</div>
-      <div class="empty" x-show="compareStores.length === 0 && !compareLoading">Run compare to see results.</div>
-      <div class="tableWrap" x-show="compareStores.length > 0">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Reviews Avg</th>
-              <th>Review Count</th>
-              <th>Google Rating</th>
-            </tr>
-          </thead>
-          <tbody>
-            <template x-for="s in compareStores" :key="s.id">
-              <tr>
-                <td x-text="s.name || '--'"></td>
-                <td x-text="s.reviews ? Number(s.reviews.averageRating).toFixed(1) : '--'"></td>
-                <td x-text="s.reviews ? s.reviews.reviewCount : 0"></td>
-                <td x-text="s.rating != null ? Number(s.rating).toFixed(1) : '--'"></td>
-              </tr>
-            </template>
-          </tbody>
-        </table>
-      </div>
+        <div class="row controls">
+          <button class="btn ghost" @click="useMyLocation()" :disabled="locating">
+            <span x-show="!locating">Use My Location</span>
+            <span x-show="locating">Locating...</span>
+          </button>
+          <label class="inlineField">
+            <span>Radius (km)</span>
+            <input class="input compact" type="number" min="1" max="500" step="1" x-model.number="radiusKm" />
+          </label>
+        </div>
 
-      <div class="sectionTitle">My Saved Shops</div>
-      <div class="empty" x-show="savedShops.length === 0 && !savedLoading">No saved shops yet.</div>
-      <div class="results">
-        <template x-for="item in savedShops" :key="item.store?.id || item.savedAt">
-          <div class="card" @click="item.store && selectStore(item.store)">
-            <div class="card-title">
-              <span x-text="item.store?.name || 'Unknown Store'"></span>
-              <span class="badge">Saved</span>
+        <template x-if="error">
+          <div class="error" x-text="error"></div>
+        </template>
+        <template x-if="notice">
+          <div class="notice" x-text="notice"></div>
+        </template>
+
+        <div class="results">
+          <template x-for="s in results" :key="s.id || s.placeId || s.name">
+            <div class="card" @click="selectStore(s)" :class="{ active: isSelectedStore(s) }">
+              <div class="card-title">
+                <span x-text="s.name ?? 'Store'"></span>
+                <span class="badge" x-show="s.distanceKm != null" x-text="`${Number(s.distanceKm).toFixed(1)} km`"></span>
+              </div>
+              <div class="card-sub" x-text="formatLoc(s)"></div>
+              <div class="card-meta" x-show="s.rating != null" x-text="`Rating: ${Number(s.rating).toFixed(1)} (${s.ratingCount ?? 0})`"></div>
+              <div class="row cardActions">
+                <button class="btn ghost small" @click.stop="toggleSaved(s)" :disabled="!s.id || isSaveBusy(s.id)">
+                  <span x-show="!isSaveBusy(s.id)" x-text="isStoreSaved(s.id) ? 'Unsave' : 'Save'"></span>
+                  <span x-show="isSaveBusy(s.id)">Working...</span>
+                </button>
+                <button class="btn ghost small" @click.stop="toggleCompare(s)" :disabled="!s.id">
+                  <span x-text="isCompareSelected(s.id) ? 'Remove Compare' : 'Add Compare'"></span>
+                </button>
+              </div>
             </div>
-            <div class="card-sub" x-text="item.store ? formatLoc(item.store) : '--'"></div>
-            <div class="card-meta" x-text="`Saved: ${formatDate(item.savedAt)}`"></div>
+          </template>
+          <div class="empty" x-show="!loading && results.length === 0">No results yet.</div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="sectionTitle">Nearby Map</div>
+        <div class="mapWrap">
+          <div id="mapCanvas" class="mapCanvas"></div>
+          <div class="mapOverlay" x-show="mapStatus" x-text="mapStatus"></div>
+        </div>
+
+        <div class="sectionTitle">Store Profile</div>
+        <template x-if="profileLoading"><div class="empty">Loading store profile...</div></template>
+        <template x-if="profileError"><div class="error" x-text="profileError"></div></template>
+
+        <template x-if="selectedDetail">
+          <div class="profile">
+            <div class="profile-name" x-text="selectedDetail.name ?? selected.name"></div>
+            <div class="profile-sub" x-text="formatLoc(selectedDetail)"></div>
+            <div class="profile-sub" x-show="selectedDetail.phone" x-text="selectedDetail.phone"></div>
+            <a class="profile-link" x-show="selectedDetail.website" :href="selectedDetail.website" target="_blank" rel="noopener noreferrer">Visit Website</a>
+            <div class="profile-sub" x-show="selectedDetail.servicesText" x-text="selectedDetail.servicesText"></div>
+            <div class="profile-sub" x-show="selectedDetail.rating != null" x-text="`Google Rating: ${Number(selectedDetail.rating).toFixed(1)} (${selectedDetail.ratingCount ?? 0})`"></div>
+
+            <div class="row controls">
+              <button class="btn ghost small" @click="toggleSaved(selectedDetail)" :disabled="!selectedDetail.id || isSaveBusy(selectedDetail.id)">
+                <span x-show="!isSaveBusy(selectedDetail.id)" x-text="isStoreSaved(selectedDetail.id) ? 'Unsave Store' : 'Save Store'"></span>
+                <span x-show="isSaveBusy(selectedDetail.id)">Working...</span>
+              </button>
+              <button class="btn ghost small" @click="toggleCompare(selectedDetail)" :disabled="!selectedDetail.id">
+                <span x-text="isCompareSelected(selectedDetail.id) ? 'Remove Compare' : 'Add Compare'"></span>
+              </button>
+            </div>
+
+            <div class="sectionTitle">Write / Update Review</div>
+            <div class="row controls">
+              <label class="inlineField">
+                <span>Rating</span>
+                <select class="input compact" x-model.number="reviewRating">
+                  <option value="5">5</option>
+                  <option value="4">4</option>
+                  <option value="3">3</option>
+                  <option value="2">2</option>
+                  <option value="1">1</option>
+                </select>
+              </label>
+              <button class="btn" @click="submitReview()" :disabled="reviewSubmitting">
+                <span x-show="!reviewSubmitting">Submit Review</span>
+                <span x-show="reviewSubmitting">Submitting...</span>
+              </button>
+            </div>
+            <textarea class="input" rows="3" placeholder="Comment (optional)" x-model="reviewComment"></textarea>
+            <div class="notice" x-show="reviewNotice" x-text="reviewNotice"></div>
+
+            <div class="sectionTitle">Reviews</div>
+            <template x-if="reviews.length === 0"><div class="empty">No reviews yet.</div></template>
+            <div class="reviewList" x-show="reviews.length > 0">
+              <template x-for="r in reviews" :key="r.id">
+                <div class="reviewCard">
+                  <div class="reviewTop">
+                    <span x-text="`Rating: ${r.rating}/5`"></span>
+                    <span x-text="formatDate(r.createdAt)"></span>
+                  </div>
+                  <div class="card-meta" x-text="r.userId ? `User: ${r.userId}` : ''"></div>
+                  <div class="reviewBody" x-text="r.comment || 'No comment.'"></div>
+                </div>
+              </template>
+            </div>
           </div>
         </template>
-      </div>
 
-      <div class="sectionTitle">Store Profile</div>
-      <template x-if="profileLoading">
-        <div class="empty">Loading store profile...</div>
-      </template>
-
-      <template x-if="profileError">
-        <div class="error" x-text="profileError"></div>
-      </template>
-
-      <template x-if="selectedDetail">
-        <div class="profile">
-          <div class="profile-name" x-text="selectedDetail.name ?? selected.name"></div>
-          <div class="profile-sub" x-text="formatLoc(selectedDetail)"></div>
-          <div class="profile-sub" x-show="selectedDetail.phone" x-text="selectedDetail.phone"></div>
-          <a class="profile-link" x-show="selectedDetail.website" :href="selectedDetail.website" target="_blank" rel="noopener noreferrer">Visit Website</a>
-          <div class="profile-sub" x-show="selectedDetail.servicesText" x-text="selectedDetail.servicesText"></div>
-          <div class="profile-sub" x-show="selectedDetail.rating != null" x-text="`Google Rating: ${Number(selectedDetail.rating).toFixed(1)} (${selectedDetail.ratingCount ?? 0})`"></div>
-
-          <div class="row controls">
-            <button
-              class="btn ghost small"
-              @click="toggleSaved(selectedDetail)"
-              :disabled="!selectedDetail.id || isSaveBusy(selectedDetail.id)">
-              <span x-show="!isSaveBusy(selectedDetail.id)" x-text="isStoreSaved(selectedDetail.id) ? 'Unsave Store' : 'Save Store'"></span>
-              <span x-show="isSaveBusy(selectedDetail.id)">Working...</span>
-            </button>
-            <button class="btn ghost small" @click="toggleCompare(selectedDetail)" :disabled="!selectedDetail.id">
-              <span x-text="isCompareSelected(selectedDetail.id) ? 'Remove Compare' : 'Add Compare'"></span>
-            </button>
-          </div>
-
-          <div class="sectionTitle">Write / Update Your Review</div>
-          <div class="row controls">
-            <label class="inlineField">
-              <span>Rating</span>
-              <select class="input compact" x-model.number="reviewRating">
-                <option value="5">5</option>
-                <option value="4">4</option>
-                <option value="3">3</option>
-                <option value="2">2</option>
-                <option value="1">1</option>
-              </select>
-            </label>
-            <button class="btn" @click="submitReview()" :disabled="reviewSubmitting">
-              <span x-show="!reviewSubmitting">Submit Review</span>
-              <span x-show="reviewSubmitting">Submitting...</span>
-            </button>
-          </div>
-          <textarea class="input" rows="3" placeholder="Comment (optional)" x-model="reviewComment"></textarea>
-          <div class="notice" x-show="reviewNotice" x-text="reviewNotice"></div>
-
-          <div class="sectionTitle">Reviews</div>
-          <template x-if="reviews.length === 0">
-            <div class="empty">No reviews yet.</div>
-          </template>
-          <div class="reviewList" x-show="reviews.length > 0">
-            <template x-for="r in reviews" :key="r.id">
-              <div class="reviewCard">
-                <div class="reviewTop">
-                  <span x-text="`Rating: ${r.rating}/5`"></span>
-                  <span x-text="formatDate(r.createdAt)"></span>
-                </div>
-                <div class="card-meta" x-text="r.userId ? `User: ${r.userId}` : ''"></div>
-                <div class="reviewBody" x-text="r.comment || 'No comment.'"></div>
-              </div>
-            </template>
-          </div>
-        </div>
-      </template>
-
-      <div class="empty" x-show="!selected && !profileLoading">
-        Select a store to see its details and reviews.
-      </div>
+        <div class="empty" x-show="!selected && !profileLoading">Select a store to see its details and reviews.</div>
+      </section>
     </section>
   </main>
 

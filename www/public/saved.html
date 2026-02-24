@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>WrenchIT Demo | Saved</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <script>
+    window.WRENCHIT_CONFIG = {
+      googleMapsApiKey: "",
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body data-page="saved" x-data="app()" x-init="initPage('saved')">
+  <header class="topbar appTopbar">
+    <div class="brandBlock">
+      <div class="brand">WrenchIT</div>
+      <div class="brandSub">Marketplace Demo</div>
+    </div>
+
+    <nav class="mainNav" aria-label="Primary">
+      <a class="navBtn" :class="{ active: isPage('explore') }" :aria-current="isPage('explore') ? 'page' : null" href="/index.html">Explore</a>
+      <a class="navBtn" :class="{ active: isPage('compare') }" :aria-current="isPage('compare') ? 'page' : null" href="/compare.html">Compare</a>
+      <a class="navBtn" :class="{ active: isPage('saved') }" :aria-current="isPage('saved') ? 'page' : null" href="/saved.html">Saved</a>
+      <a class="navBtn" :class="{ active: isPage('receipts') }" :aria-current="isPage('receipts') ? 'page' : null" href="/receipts.html">Receipts</a>
+      <a class="navBtn" :class="{ active: isPage('profile') }" :aria-current="isPage('profile') ? 'page' : null" href="/profile.html">Profile</a>
+    </nav>
+
+    <div class="right">
+      <button class="btn ghost small" @click="ping()" :disabled="pinging">
+        <span x-show="!pinging">Ping API</span>
+        <span x-show="pinging">Pinging...</span>
+      </button>
+      <span class="pill" x-text="apiOk ? 'API OK' : 'API ?'"></span>
+      <span class="pill" x-text="hasAuthToken() ? 'Token Set' : 'No Token'"></span>
+    </div>
+  </header>
+
+  <main class="pageContainer" :class="{ compact: userSettings?.compactMode }">
+    <section class="pageIntro">
+      <div class="pageHeader">
+        <div class="introText">
+          <h1>Saved Shops</h1>
+          <p>Track stores you have bookmarked. Open one to jump directly back to its profile and review feed.</p>
+        </div>
+        <div class="row controls">
+          <button class="btn ghost" @click="loadSavedShops()" :disabled="savedLoading">
+            <span x-show="!savedLoading">Refresh Saved</span>
+            <span x-show="savedLoading">Loading...</span>
+          </button>
+          <a class="btn ghost" href="/index.html">Back To Explore</a>
+        </div>
+      </div>
+      <div class="metricRow">
+        <div class="metricCard">
+          <div class="card-sub">Saved Shops</div>
+          <div class="metricValue" x-text="savedShops.length"></div>
+        </div>
+        <div class="metricCard">
+          <div class="card-sub">Busy Actions</div>
+          <div class="metricValue" x-text="saveBusyIds.length"></div>
+        </div>
+        <div class="metricCard">
+          <div class="card-sub">Compare Queue</div>
+          <div class="metricValue" x-text="compareIds.length"></div>
+        </div>
+      </div>
+    </section>
+    <template x-if="error"><div class="error" x-text="error"></div></template>
+    <template x-if="notice"><div class="notice" x-text="notice"></div></template>
+
+    <section class="panel">
+      <div class="card-sub">Saved stores come from <code>/api/me/saved</code>. If auth is disabled, this list may be empty.</div>
+      <div class="empty" x-show="savedShops.length === 0 && !savedLoading">No saved shops yet.</div>
+      <div class="results">
+        <template x-for="item in savedShops" :key="item.store?.id || item.savedAt">
+          <div class="card">
+            <div class="card-title">
+              <span x-text="item.store?.name || 'Unknown Store'"></span>
+              <span class="badge">Saved</span>
+            </div>
+            <div class="card-sub" x-text="item.store ? formatLoc(item.store) : '--'"></div>
+            <div class="card-meta" x-text="`Saved: ${formatDate(item.savedAt)}`"></div>
+            <div class="row cardActions">
+              <button class="btn ghost small" @click.stop="item.store && toggleSaved(item.store)" :disabled="!item.store?.id || isSaveBusy(item.store.id)">
+                <span x-show="item.store && !isSaveBusy(item.store.id)">Unsave</span>
+                <span x-show="item.store && isSaveBusy(item.store.id)">Working...</span>
+              </button>
+              <button class="btn ghost small" @click.stop="item.store && goToPage('explore', { storeId: item.store.id })" :disabled="!item.store?.id">Open Store</button>
+            </div>
+          </div>
+        </template>
+      </div>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>

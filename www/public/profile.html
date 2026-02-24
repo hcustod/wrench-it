@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>WrenchIT Demo | Profile</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <script>
+    window.WRENCHIT_CONFIG = {
+      googleMapsApiKey: "",
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body data-page="profile" x-data="app()" x-init="initPage('profile')">
+  <header class="topbar appTopbar">
+    <div class="brandBlock">
+      <div class="brand">WrenchIT</div>
+      <div class="brandSub">Marketplace Demo</div>
+    </div>
+
+    <nav class="mainNav" aria-label="Primary">
+      <a class="navBtn" :class="{ active: isPage('explore') }" :aria-current="isPage('explore') ? 'page' : null" href="/index.html">Explore</a>
+      <a class="navBtn" :class="{ active: isPage('compare') }" :aria-current="isPage('compare') ? 'page' : null" href="/compare.html">Compare</a>
+      <a class="navBtn" :class="{ active: isPage('saved') }" :aria-current="isPage('saved') ? 'page' : null" href="/saved.html">Saved</a>
+      <a class="navBtn" :class="{ active: isPage('receipts') }" :aria-current="isPage('receipts') ? 'page' : null" href="/receipts.html">Receipts</a>
+      <a class="navBtn" :class="{ active: isPage('profile') }" :aria-current="isPage('profile') ? 'page' : null" href="/profile.html">Profile</a>
+    </nav>
+
+    <div class="right">
+      <button class="btn ghost small" @click="ping()" :disabled="pinging">
+        <span x-show="!pinging">Ping API</span>
+        <span x-show="pinging">Pinging...</span>
+      </button>
+      <span class="pill" x-text="apiOk ? 'API OK' : 'API ?'"></span>
+      <span class="pill" x-text="hasAuthToken() ? 'Token Set' : 'No Token'"></span>
+    </div>
+  </header>
+
+  <main class="pageContainer" :class="{ compact: userSettings?.compactMode }">
+    <section class="pageIntro">
+      <div class="pageHeader">
+        <div class="introText">
+          <h1>User Settings</h1>
+          <p>Manage local demo preferences and optionally set a token for authenticated API scenarios.</p>
+        </div>
+      </div>
+      <div class="metricRow">
+        <div class="metricCard">
+          <div class="card-sub">Saved Shops</div>
+          <div class="metricValue" x-text="savedShops.length"></div>
+        </div>
+        <div class="metricCard">
+          <div class="card-sub">Compare Queue</div>
+          <div class="metricValue" x-text="compareIds.length"></div>
+        </div>
+        <div class="metricCard">
+          <div class="card-sub">Pending Receipts</div>
+          <div class="metricValue" x-text="pendingReceiptsCount()"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="pageGrid twoCol">
+      <section class="panel">
+        <div class="sectionTitle">Auth + Session</div>
+        <div class="row controls">
+          <input class="input" placeholder="Paste JWT token (optional for local auth-disabled mode)" x-model="authTokenInput" />
+          <button class="btn" @click="saveAuthToken()">Save Token</button>
+          <button class="btn ghost" @click="clearAuthToken()">Clear</button>
+        </div>
+        <div class="row controls">
+          <button class="btn ghost" @click="loadMe()" :disabled="meLoading">
+            <span x-show="!meLoading">Load /api/me</span>
+            <span x-show="meLoading">Loading...</span>
+          </button>
+          <button class="btn ghost" @click="loadSavedShops()" :disabled="savedLoading">
+            <span x-show="!savedLoading">Load My Saved</span>
+            <span x-show="savedLoading">Loading...</span>
+          </button>
+        </div>
+        <div class="card mutedCard" x-show="me">
+          <div class="card-title">
+            <span x-text="profileDisplayName()"></span>
+            <span class="badge" x-text="me?.role || 'CUSTOMER'"></span>
+          </div>
+          <div class="card-sub" x-text="profileEmailAlias()"></div>
+          <div class="card-sub" x-text="profileHomeLabel()"></div>
+        </div>
+        <div class="empty" x-show="!me && !meLoading">No loaded profile yet.</div>
+        <div class="error" x-show="meError" x-text="meError"></div>
+      </section>
+
+      <section class="panel">
+        <div class="sectionTitle">Local Test Preferences</div>
+        <div class="settingsGrid">
+          <label class="inlineField settingField">
+            <span>Display Name</span>
+            <input class="input" placeholder="Local test user display name" x-model="userSettings.displayName" />
+          </label>
+          <label class="inlineField settingField">
+            <span>Email Alias</span>
+            <input class="input" placeholder="local-dev@wrenchit.local" x-model="userSettings.emailAlias" />
+          </label>
+          <label class="inlineField settingField">
+            <span>Home City</span>
+            <input class="input" placeholder="Hartford" x-model="userSettings.homeCity" />
+          </label>
+          <label class="inlineField settingField">
+            <span>Home State</span>
+            <input class="input" placeholder="CT" x-model="userSettings.homeState" />
+          </label>
+        </div>
+        <div class="row controls">
+          <label class="check">
+            <input type="checkbox" x-model="userSettings.notifications" />
+            <span>Enable Test Notifications</span>
+          </label>
+          <label class="check">
+            <input type="checkbox" x-model="userSettings.compactMode" />
+            <span>Compact Layout</span>
+          </label>
+        </div>
+        <div class="row controls">
+          <button class="btn" @click="saveUserSettings()">Save Settings</button>
+          <button class="btn ghost" @click="resetUserSettings()">Reset Defaults</button>
+        </div>
+        <div class="notice" x-show="settingsNotice" x-text="settingsNotice"></div>
+
+        <div class="sectionTitle">Snapshot</div>
+        <div class="statsRow">
+          <div class="statCard">
+            <div class="card-sub">Saved Shops</div>
+            <div class="statValue" x-text="savedShops.length"></div>
+          </div>
+          <div class="statCard">
+            <div class="card-sub">Compare Queue</div>
+            <div class="statValue" x-text="compareIds.length"></div>
+          </div>
+          <div class="statCard">
+            <div class="card-sub">Pending Receipts</div>
+            <div class="statValue" x-text="pendingReceiptsCount()"></div>
+          </div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>
