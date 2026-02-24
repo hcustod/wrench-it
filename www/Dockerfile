@@ -1,4 +1,16 @@
-FROM caddy:alpine
-
-COPY ./public/ /srv/
-COPY ./Caddyfile /etc/caddy/Caddyfile
+# ---- build stage ----
+    FROM node:20-alpine AS build
+    WORKDIR /app
+    
+    COPY package*.json ./
+    RUN npm ci
+    
+    COPY . .
+    RUN npm run build
+    
+    # ---- serve stage ----
+    FROM caddy:2-alpine
+    WORKDIR /srv
+    
+    COPY --from=build /app/dist /srv
+    COPY Caddyfile /etc/caddy/Caddyfile
