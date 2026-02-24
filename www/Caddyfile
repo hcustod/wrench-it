@@ -1,7 +1,13 @@
-:80 {
-  root * /srv
-  file_server
+:80
 
-  @api path /api/*
-  reverse_proxy @api api:8080
+root * /srv
+encode gzip
+
+# API reverse proxy (keep as-is if already working)
+handle_path /api/* {
+  reverse_proxy api:8080
 }
+
+# Serve static files + SPA fallback
+try_files {path} /index.html
+file_server

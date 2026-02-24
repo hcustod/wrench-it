@@ -1,0 +1,222 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+body {
+  background-color: #1E1B2E;
+  color: #ffffff;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-size: 16px;
+}
+
+h1 {
+  font-size: 2.2rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+h2 {
+  font-size: 1.6rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+p {
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.display-5 {
+  font-size: 2.3rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+body,
+body * {
+  box-sizing: border-box;
+}
+
+body,
+.wt-text-default {
+  color: #ffffff;
+}
+
+.wt-text-muted,
+body .text-muted {
+  color: #C5C3DA !important;
+}
+
+.wt-card {
+  background-color: #242133;
+  border: 1px solid #3A3652;
+  border-radius: 16px;
+  padding: 1.5rem;
+  color: inherit;
+}
+
+.wt-nav {
+  position: sticky;
+  top: 0;
+  z-index: 1040;
+  background-color: #242133;
+  border-bottom: 1px solid #3A3652;
+}
+
+.wt-footer {
+  background-color: #242133;
+  border-top: 1px solid #3A3652;
+}
+
+.wt-link-nav {
+  color: #C5C3DA;
+  font-size: 0.875rem;
+  text-decoration: none;
+}
+
+.wt-link-nav:hover {
+  color: #6C63FF;
+}
+
+.wt-link-nav-active {
+  color: #6C63FF;
+}
+
+.wt-chip-service {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.75rem;
+  border-radius: 0.75rem;
+  background-color: #2A2740;
+  border: 1px solid #3A3652;
+  color: #A699FF;
+  font-size: 0.8rem;
+}
+
+.wt-input {
+  background-color: #2A2740;
+  border: 1px solid #3A3652;
+  color: #ffffff;
+  height: 44px;
+  border-radius: 12px;
+  padding: 0 0.85rem;
+  font-size: 0.95rem;
+}
+
+.form-control.wt-input {
+  height: 44px;
+  border-radius: 12px;
+  padding: 0 0.85rem;
+  font-size: 0.95rem;
+}
+
+.wt-input::placeholder {
+  color: #C5C3DA;
+}
+
+.wt-input {
+  background-color: #2A2740;
+  border: 1px solid #3A3652;
+  color: #ffffff;
+}
+
+.wt-input::placeholder {
+  color: #C5C3DA;
+}
+
+.wt-input:focus {
+  border-color: #FF8C42;
+  outline: none;
+  box-shadow: none;
+  background-color: #2A2740;
+  color: #ffffff;
+}
+
+/* Input groups: icon + input as a single pill */
+.input-group .input-group-text {
+  background-color: #2A2740 !important;
+  border: 1px solid #3A3652 !important;
+  border-right: 0 !important;
+  border-radius: 12px 0 0 12px !important;
+  color: #C5C3DA;
+}
+
+.input-group .form-control.wt-input {
+  border-left: 0 !important;
+  border-radius: 0 12px 12px 0;
+}
+
+.btn-wt-primary {
+  background-color: #6C63FF;
+  border-color: #6C63FF;
+  color: #ffffff;
+  border-radius: 12px;
+}
+
+.btn-wt-primary:hover,
+.btn-wt-primary:focus {
+  background-color: #A699FF;
+  border-color: #A699FF;
+  color: #ffffff;
+}
+
+.btn-wt-outline {
+  background-color: transparent;
+  border: 2px solid #6C63FF;
+  color: #6C63FF;
+  border-radius: 12px;
+}
+
+.btn-wt-outline:hover,
+.btn-wt-outline:focus {
+  background-color: #2A2740;
+  color: #6C63FF;
+}
+
+.btn-wt-orange {
+  background-color: transparent;
+  border: 2px solid #FF8C42;
+  color: #FF8C42;
+  border-radius: 12px;
+}
+
+.btn-wt-orange:hover,
+.btn-wt-orange:focus {
+  background-color: rgba(255, 140, 66, 0.1);
+  color: #FF8C42;
+}
+
+.wt-badge-verified {
+  display: inline-block;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  background-color: rgba(46, 204, 113, 0.15);
+  color: #2ecc71;
+  border: 1px solid rgba(46, 204, 113, 0.4);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.wt-badge-pending {
+  display: inline-block;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  background-color: rgba(255, 140, 66, 0.15);
+  color: #FF8C42;
+  border: 1px solid rgba(255, 140, 66, 0.4);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.wt-badge-published {
+  display: inline-block;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  background-color: rgba(108, 99, 255, 0.18);
+  color: #6C63FF;
+  border: 1px solid rgba(108, 99, 255, 0.5);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
