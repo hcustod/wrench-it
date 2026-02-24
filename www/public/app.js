@@ -643,7 +643,7 @@ function app() {
         this.mapReady = true;
         this.mapStatus = "";
       } catch (_e) {
-        this.mapStatus = "Could not load Google Maps API. Check API key and network.";
+        this.mapStatus = "Could not load Google Maps API. Check key, API enablement, billing, and localhost referrer restrictions.";
       }
     },
 

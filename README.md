@@ -30,6 +30,7 @@ docker-compose up -d
 3) (Optional) Run auth service:
 ```
 ./mvnw -pl services/auth -am spring-boot:run
+```
 
 ## Build
 Build all modules:

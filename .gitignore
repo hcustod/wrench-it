@@ -67,6 +67,7 @@ application-*.properties
 bootstrap-*.yml
 bootstrap-*.yaml
 bootstrap-*.properties
+!services/api/src/test/resources/application-test.yml
 
 ############################
 # Environment / Secrets (STRICT)

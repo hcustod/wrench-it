@@ -2,6 +2,7 @@ package com.wrenchit.api.controller;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -100,8 +101,9 @@ public class StoreController {
     public StoreCompareResponse compare(@RequestParam("ids") List<UUID> ids,
                                         @RequestParam(value = "sort", defaultValue = "RATING") CompareSort sort,
                                         @RequestParam(value = "direction", defaultValue = "DESC") SortDirection direction) {
-        List<Store> stores = storeService.getByIdsOrdered(ids);
-        Map<UUID, ReviewSummary> summaries = reviewService.summarizeByStoreIds(ids);
+        List<UUID> uniqueIds = new ArrayList<>(new LinkedHashSet<>(ids));
+        List<Store> stores = storeService.getByIdsOrdered(uniqueIds);
+        Map<UUID, ReviewSummary> summaries = reviewService.summarizeByStoreIds(uniqueIds);
 
         List<StoreCompareItem> items = new ArrayList<>();
         for (Store store : stores) {
