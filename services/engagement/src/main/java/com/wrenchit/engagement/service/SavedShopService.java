@@ -29,9 +29,12 @@ public class SavedShopService {
 
     @Transactional
     public SavedShop save(UUID userId, UUID storeId) {
-        SavedShop saved = new SavedShop();
-        saved.setId(new SavedShopId(userId, storeId));
-        return savedShopRepository.save(saved);
+        SavedShopId id = new SavedShopId(userId, storeId);
+        return savedShopRepository.findById(id).orElseGet(() -> {
+            SavedShop saved = new SavedShop();
+            saved.setId(id);
+            return savedShopRepository.save(saved);
+        });
     }
 
     @Transactional

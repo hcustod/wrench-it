@@ -22,11 +22,39 @@
         <span x-show="pinging">Pinging...</span>
       </button>
       <span class="pill" x-text="apiOk ? 'API OK' : 'API ?'"></span>
+      <span class="pill" x-text="hasAuthToken() ? 'Token Set' : 'No Token'"></span>
     </div>
   </header>
 
   <main class="shell">
     <section class="panel">
+      <div class="sectionTitle">Auth + Session</div>
+      <div class="row controls">
+        <input class="input" placeholder="Paste JWT token (optional for local auth-disabled mode)" x-model="authTokenInput" />
+        <button class="btn" @click="saveAuthToken()">Save Token</button>
+        <button class="btn ghost" @click="clearAuthToken()">Clear</button>
+      </div>
+      <div class="row controls">
+        <button class="btn ghost" @click="loadMe()" :disabled="meLoading">
+          <span x-show="!meLoading">Load /api/me</span>
+          <span x-show="meLoading">Loading...</span>
+        </button>
+        <button class="btn ghost" @click="loadSavedShops()" :disabled="savedLoading">
+          <span x-show="!savedLoading">Load My Saved</span>
+          <span x-show="savedLoading">Loading...</span>
+        </button>
+      </div>
+      <div class="card mutedCard" x-show="me">
+        <div class="card-title">
+          <span x-text="me.displayName || me.email || me.keycloakSub || 'User'"></span>
+          <span class="badge" x-text="me.role || 'CUSTOMER'"></span>
+        </div>
+        <div class="card-sub" x-text="me.email || '--'"></div>
+      </div>
+      <div class="empty" x-show="!me && !meLoading">No loaded profile yet.</div>
+      <div class="error" x-show="meError" x-text="meError"></div>
+
+      <div class="sectionTitle">Search</div>
       <div class="row controls">
         <input class="input" placeholder="Search stores (e.g., brakes, oil change, mechanic)..." x-model="q" @keydown.enter.prevent="search()" />
         <button class="btn" @click="search()" :disabled="loading">
@@ -46,6 +74,15 @@
         </label>
       </div>
 
+      <div class="row controls">
+        <button class="btn ghost" @click="runCompare()" :disabled="compareLoading || compareIds.length < 2">
+          <span x-show="!compareLoading">Compare Selected</span>
+          <span x-show="compareLoading">Comparing...</span>
+        </button>
+        <button class="btn ghost" @click="clearCompare()" :disabled="compareIds.length === 0">Clear Compare</button>
+        <span class="pill" x-text="`${compareIds.length}/4 selected`"></span>
+      </div>
+
       <template x-if="error">
         <div class="error" x-text="error"></div>
       </template>
@@ -54,9 +91,13 @@
         <div class="notice" x-text="notice"></div>
       </template>
 
+      <template x-if="compareError">
+        <div class="error" x-text="compareError"></div>
+      </template>
+
       <div class="results">
         <template x-for="s in results" :key="s.id || s.placeId || s.name">
-          <button class="card" @click="selectStore(s)" :class="{ active: selected && (selected.id || selected.placeId) === (s.id || s.placeId) }">
+          <div class="card" @click="selectStore(s)" :class="{ active: isSelectedStore(s) }">
             <div class="card-title">
               <span x-text="s.name ?? 'Store'"></span>
               <span class="badge" x-show="s.distanceKm != null" x-text="`${Number(s.distanceKm).toFixed(1)} km`"></span>
@@ -65,7 +106,19 @@
             <div class="card-meta">
               <span x-show="s.rating != null" x-text="`Rating: ${Number(s.rating).toFixed(1)} (${s.ratingCount ?? 0})`"></span>
             </div>
-          </button>
+            <div class="row cardActions">
+              <button
+                class="btn ghost small"
+                @click.stop="toggleSaved(s)"
+                :disabled="!s.id || isSaveBusy(s.id)">
+                <span x-show="!isSaveBusy(s.id)" x-text="isStoreSaved(s.id) ? 'Unsave' : 'Save'"></span>
+                <span x-show="isSaveBusy(s.id)">Working...</span>
+              </button>
+              <button class="btn ghost small" @click.stop="toggleCompare(s)" :disabled="!s.id">
+                <span x-text="isCompareSelected(s.id) ? 'Remove Compare' : 'Add Compare'"></span>
+              </button>
+            </div>
+          </div>
         </template>
 
         <div class="empty" x-show="!loading && results.length === 0">
@@ -79,6 +132,46 @@
       <div class="mapWrap">
         <div id="mapCanvas" class="mapCanvas"></div>
         <div class="mapOverlay" x-show="mapStatus" x-text="mapStatus"></div>
+      </div>
+
+      <div class="sectionTitle">Compare Results</div>
+      <div class="empty" x-show="compareStores.length === 0 && !compareLoading">Run compare to see results.</div>
+      <div class="tableWrap" x-show="compareStores.length > 0">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Reviews Avg</th>
+              <th>Review Count</th>
+              <th>Google Rating</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="s in compareStores" :key="s.id">
+              <tr>
+                <td x-text="s.name || '--'"></td>
+                <td x-text="s.reviews ? Number(s.reviews.averageRating).toFixed(1) : '--'"></td>
+                <td x-text="s.reviews ? s.reviews.reviewCount : 0"></td>
+                <td x-text="s.rating != null ? Number(s.rating).toFixed(1) : '--'"></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="sectionTitle">My Saved Shops</div>
+      <div class="empty" x-show="savedShops.length === 0 && !savedLoading">No saved shops yet.</div>
+      <div class="results">
+        <template x-for="item in savedShops" :key="item.store?.id || item.savedAt">
+          <div class="card" @click="item.store && selectStore(item.store)">
+            <div class="card-title">
+              <span x-text="item.store?.name || 'Unknown Store'"></span>
+              <span class="badge">Saved</span>
+            </div>
+            <div class="card-sub" x-text="item.store ? formatLoc(item.store) : '--'"></div>
+            <div class="card-meta" x-text="`Saved: ${formatDate(item.savedAt)}`"></div>
+          </div>
+        </template>
       </div>
 
       <div class="sectionTitle">Store Profile</div>
@@ -99,6 +192,39 @@
           <div class="profile-sub" x-show="selectedDetail.servicesText" x-text="selectedDetail.servicesText"></div>
           <div class="profile-sub" x-show="selectedDetail.rating != null" x-text="`Google Rating: ${Number(selectedDetail.rating).toFixed(1)} (${selectedDetail.ratingCount ?? 0})`"></div>
 
+          <div class="row controls">
+            <button
+              class="btn ghost small"
+              @click="toggleSaved(selectedDetail)"
+              :disabled="!selectedDetail.id || isSaveBusy(selectedDetail.id)">
+              <span x-show="!isSaveBusy(selectedDetail.id)" x-text="isStoreSaved(selectedDetail.id) ? 'Unsave Store' : 'Save Store'"></span>
+              <span x-show="isSaveBusy(selectedDetail.id)">Working...</span>
+            </button>
+            <button class="btn ghost small" @click="toggleCompare(selectedDetail)" :disabled="!selectedDetail.id">
+              <span x-text="isCompareSelected(selectedDetail.id) ? 'Remove Compare' : 'Add Compare'"></span>
+            </button>
+          </div>
+
+          <div class="sectionTitle">Write / Update Your Review</div>
+          <div class="row controls">
+            <label class="inlineField">
+              <span>Rating</span>
+              <select class="input compact" x-model.number="reviewRating">
+                <option value="5">5</option>
+                <option value="4">4</option>
+                <option value="3">3</option>
+                <option value="2">2</option>
+                <option value="1">1</option>
+              </select>
+            </label>
+            <button class="btn" @click="submitReview()" :disabled="reviewSubmitting">
+              <span x-show="!reviewSubmitting">Submit Review</span>
+              <span x-show="reviewSubmitting">Submitting...</span>
+            </button>
+          </div>
+          <textarea class="input" rows="3" placeholder="Comment (optional)" x-model="reviewComment"></textarea>
+          <div class="notice" x-show="reviewNotice" x-text="reviewNotice"></div>
+
           <div class="sectionTitle">Reviews</div>
           <template x-if="reviews.length === 0">
             <div class="empty">No reviews yet.</div>
@@ -110,6 +236,7 @@
                   <span x-text="`Rating: ${r.rating}/5`"></span>
                   <span x-text="formatDate(r.createdAt)"></span>
                 </div>
+                <div class="card-meta" x-text="r.userId ? `User: ${r.userId}` : ''"></div>
                 <div class="reviewBody" x-text="r.comment || 'No comment.'"></div>
               </div>
             </template>

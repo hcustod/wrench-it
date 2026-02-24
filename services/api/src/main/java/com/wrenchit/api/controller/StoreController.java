@@ -6,6 +6,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -33,6 +39,7 @@ import com.wrenchit.stores.service.StoreService;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
 
 @RestController
+@Validated
 @RequestMapping("/api/stores")
 public class StoreController {
 
@@ -46,14 +53,14 @@ public class StoreController {
 
     @GetMapping("/search")
     public StoreSearchResponse search(@RequestParam(value = "q", required = false) String query,
-                                      @RequestParam(value = "limit", defaultValue = "20") int limit,
-                                      @RequestParam(value = "offset", defaultValue = "0") int offset,
+                                      @RequestParam(value = "limit", defaultValue = "20") @Min(1) @Max(100) int limit,
+                                      @RequestParam(value = "offset", defaultValue = "0") @Min(0) int offset,
                                       @RequestParam(value = "sort", defaultValue = "RATING") StoreSort sort,
                                       @RequestParam(value = "direction", defaultValue = "DESC") com.wrenchit.stores.dto.SortDirection direction,
-                                      @RequestParam(value = "lat", required = false) Double lat,
-                                      @RequestParam(value = "lng", required = false) Double lng,
-                                      @RequestParam(value = "radiusKm", required = false) Double radiusKm,
-                                      @RequestParam(value = "minRating", required = false) Double minRating,
+                                      @RequestParam(value = "lat", required = false) @DecimalMin("-90.0") @DecimalMax("90.0") Double lat,
+                                      @RequestParam(value = "lng", required = false) @DecimalMin("-180.0") @DecimalMax("180.0") Double lng,
+                                      @RequestParam(value = "radiusKm", required = false) @DecimalMin("0.1") @DecimalMax("500.0") Double radiusKm,
+                                      @RequestParam(value = "minRating", required = false) @DecimalMin("0.0") @DecimalMax("5.0") Double minRating,
                                       @RequestParam(value = "services", required = false) String services,
                                       @RequestParam(value = "city", required = false) String city,
                                       @RequestParam(value = "state", required = false) String state,

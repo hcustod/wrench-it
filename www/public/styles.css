@@ -17,18 +17,19 @@ body{
 }
 
 .topbar{
-  height:56px;
+  min-height:56px;
   display:flex;
   align-items:center;
   justify-content:space-between;
-  padding:0 14px;
+  padding:8px 14px;
   border-bottom:1px solid var(--border);
   background:rgba(17,21,27,.85);
+  gap:10px;
 }
 
 .brand{font-weight:800}
 
-.right{display:flex;align-items:center;gap:10px}
+.right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 
 .pill{
   padding:6px 10px;
@@ -89,6 +90,16 @@ body{
   cursor:pointer;
 }
 
+.btn.small{
+  padding:7px 10px;
+  font-size:12px;
+}
+
+.btn:disabled{
+  opacity:.6;
+  cursor:not-allowed;
+}
+
 .btn.ghost{
   background:transparent;
   border:1px solid var(--border);
@@ -139,9 +150,14 @@ body{
   box-shadow:0 0 0 1px rgba(77,163,255,.3) inset;
 }
 
+.mutedCard{
+  cursor:default;
+}
+
 .card-title{
   display:flex;
   justify-content:space-between;
+  align-items:center;
   gap:10px;
   font-weight:900;
 }
@@ -156,6 +172,10 @@ body{
   margin-top:6px;
   color:var(--muted);
   font-size:12px;
+}
+
+.cardActions{
+  margin-top:8px;
 }
 
 .badge{
@@ -174,7 +194,12 @@ body{
 
 .sectionTitle{
   font-weight:900;
+  margin-top:16px;
   margin-bottom:8px;
+}
+
+.sectionTitle:first-child{
+  margin-top:0;
 }
 
 .mapWrap{
@@ -187,7 +212,7 @@ body{
 
 .mapCanvas{
   width:100%;
-  height:320px;
+  height:300px;
   background:linear-gradient(120deg,#0f1722,#1a2738);
 }
 
@@ -202,6 +227,36 @@ body{
   background:rgba(11,13,16,.74);
   color:var(--muted);
   font-size:13px;
+}
+
+.tableWrap{
+  overflow:auto;
+  border:1px solid var(--border);
+  border-radius:12px;
+}
+
+.table{
+  width:100%;
+  border-collapse:collapse;
+  font-size:13px;
+}
+
+.table th,
+.table td{
+  text-align:left;
+  padding:10px;
+  border-bottom:1px solid var(--border);
+  vertical-align:top;
+}
+
+.table th{
+  color:var(--muted);
+  font-weight:700;
+  background:rgba(255,255,255,.03);
+}
+
+.table tr:last-child td{
+  border-bottom:none;
 }
 
 .profile{
@@ -254,16 +309,6 @@ body{
   margin-top:8px;
   font-size:13px;
   line-height:1.45;
-}
-
-.code{
-  margin:0;
-  padding:10px;
-  border-radius:12px;
-  border:1px solid rgba(255,255,255,.08);
-  background:rgba(0,0,0,.25);
-  overflow:auto;
-  font-size:12px;
 }
 
 @media (max-width:980px){

@@ -27,13 +27,40 @@ function app() {
     searchCircle: null,
     mapStatus: "",
 
+    authTokenInput: "",
+    authToken: "",
+    me: null,
+    meLoading: false,
+    meError: null,
+
+    savedShops: [],
+    savedStoreIds: [],
+    savedLoading: false,
+    saveBusyIds: [],
+
+    reviewRating: 5,
+    reviewComment: "",
+    reviewSubmitting: false,
+    reviewNotice: null,
+
+    compareIds: [],
+    compareStores: [],
+    compareLoading: false,
+    compareError: null,
+
     async init() {
       const params = new URLSearchParams(window.location.search);
       const fromUrl = (params.get("gmapsKey") || "").trim();
       const fromConfig = (window.WRENCHIT_CONFIG?.googleMapsApiKey || "").trim();
       this.googleMapsApiKey = fromUrl || fromConfig;
 
+      this.authToken = (window.localStorage.getItem("wrenchit.auth.token") || "").trim();
+      this.authTokenInput = this.authToken;
+
       this.ping().catch(() => {});
+      this.loadMe().catch(() => {});
+      this.loadSavedShops().catch(() => {});
+
       await this.initializeMap();
       await this.useMyLocation({ auto: true });
       if (!this.searchCenter) {
@@ -42,7 +69,7 @@ function app() {
     },
 
     formatLoc(s) {
-      const parts = [s.address, s.city, s.state, s.postalCode].filter(Boolean);
+      const parts = [s?.address, s?.city, s?.state, s?.postalCode].filter(Boolean);
       return parts.join(", ") || "--";
     },
 
@@ -53,15 +80,216 @@ function app() {
       return date.toLocaleString();
     },
 
+    isSelectedStore(store) {
+      return this.selected && (this.selected.id || this.selected.placeId) === (store.id || store.placeId);
+    },
+
+    hasAuthToken() {
+      return Boolean(this.authToken);
+    },
+
+    withAuthHeaders(base = {}) {
+      const headers = { ...base };
+      if (this.authToken) {
+        headers.Authorization = `Bearer ${this.authToken}`;
+      }
+      return headers;
+    },
+
+    async apiFetch(url, { method = "GET", body, headers = {} } = {}) {
+      const res = await fetch(url, {
+        method,
+        headers: this.withAuthHeaders({
+          Accept: "application/json",
+          ...(body ? { "Content-Type": "application/json" } : {}),
+          ...headers,
+        }),
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      return res;
+    },
+
+    async readError(res, prefix) {
+      const text = await res.text().catch(() => "");
+      return `${prefix} (${res.status}): ${text || res.statusText}`;
+    },
+
     async ping() {
       this.pinging = true;
       try {
-        const res = await fetch("/api/stores/search?q=mechanic&limit=1&offset=0", {
-          headers: { "Accept": "application/json" },
-        });
+        const res = await this.apiFetch("/api/stores/search?q=mechanic&limit=1&offset=0");
         this.apiOk = res.ok;
       } finally {
         this.pinging = false;
+      }
+    },
+
+    saveAuthToken() {
+      this.authToken = (this.authTokenInput || "").trim();
+      if (this.authToken) {
+        window.localStorage.setItem("wrenchit.auth.token", this.authToken);
+      } else {
+        window.localStorage.removeItem("wrenchit.auth.token");
+      }
+      this.loadMe().catch(() => {});
+      this.loadSavedShops().catch(() => {});
+    },
+
+    clearAuthToken() {
+      this.authToken = "";
+      this.authTokenInput = "";
+      window.localStorage.removeItem("wrenchit.auth.token");
+      this.loadMe().catch(() => {});
+      this.loadSavedShops().catch(() => {});
+    },
+
+    async loadMe() {
+      this.meLoading = true;
+      this.meError = null;
+      try {
+        const res = await this.apiFetch("/api/me");
+        if (!res.ok) {
+          this.me = null;
+          this.meError = await this.readError(res, "Could not load profile");
+          return;
+        }
+        this.me = await res.json();
+      } catch (e) {
+        this.me = null;
+        this.meError = e?.message || "Could not load profile.";
+      } finally {
+        this.meLoading = false;
+      }
+    },
+
+    setSavedStoreIdsFromSavedShops() {
+      this.savedStoreIds = this.savedShops
+        .map((item) => item?.store?.id)
+        .filter((id) => Boolean(id));
+    },
+
+    async loadSavedShops() {
+      this.savedLoading = true;
+      try {
+        const res = await this.apiFetch("/api/me/saved");
+        if (!res.ok) {
+          this.savedShops = [];
+          this.setSavedStoreIdsFromSavedShops();
+          return;
+        }
+        this.savedShops = await res.json();
+        this.setSavedStoreIdsFromSavedShops();
+      } catch (_e) {
+        this.savedShops = [];
+        this.setSavedStoreIdsFromSavedShops();
+      } finally {
+        this.savedLoading = false;
+      }
+    },
+
+    isStoreSaved(storeId) {
+      return Boolean(storeId) && this.savedStoreIds.includes(storeId);
+    },
+
+    isSaveBusy(storeId) {
+      return Boolean(storeId) && this.saveBusyIds.includes(storeId);
+    },
+
+    async toggleSaved(store) {
+      if (!store?.id) {
+        this.notice = "Cannot save this store yet.";
+        return;
+      }
+
+      const storeId = store.id;
+      if (this.isSaveBusy(storeId)) return;
+      this.saveBusyIds = [...this.saveBusyIds, storeId];
+
+      try {
+        if (this.isStoreSaved(storeId)) {
+          const res = await this.apiFetch(`/api/stores/${storeId}/save`, { method: "DELETE" });
+          if (!res.ok) {
+            this.error = await this.readError(res, "Failed to unsave store");
+            return;
+          }
+          this.savedStoreIds = this.savedStoreIds.filter((id) => id !== storeId);
+          this.savedShops = this.savedShops.filter((s) => s?.store?.id !== storeId);
+        } else {
+          const res = await this.apiFetch(`/api/stores/${storeId}/save`, { method: "POST" });
+          if (!res.ok) {
+            this.error = await this.readError(res, "Failed to save store");
+            return;
+          }
+          if (!this.savedStoreIds.includes(storeId)) {
+            this.savedStoreIds = [...this.savedStoreIds, storeId];
+          }
+        }
+        await this.loadSavedShops();
+      } catch (e) {
+        this.error = e?.message || "Save action failed.";
+      } finally {
+        this.saveBusyIds = this.saveBusyIds.filter((id) => id !== storeId);
+      }
+    },
+
+    isCompareSelected(storeId) {
+      return Boolean(storeId) && this.compareIds.includes(storeId);
+    },
+
+    toggleCompare(store) {
+      if (!store?.id) {
+        this.notice = "Cannot compare this store yet.";
+        return;
+      }
+      const id = store.id;
+      this.compareError = null;
+
+      if (this.compareIds.includes(id)) {
+        this.compareIds = this.compareIds.filter((x) => x !== id);
+        return;
+      }
+
+      if (this.compareIds.length >= 4) {
+        this.compareError = "Compare supports up to 4 stores.";
+        return;
+      }
+      this.compareIds = [...this.compareIds, id];
+    },
+
+    clearCompare() {
+      this.compareIds = [];
+      this.compareStores = [];
+      this.compareError = null;
+    },
+
+    async runCompare() {
+      if (this.compareIds.length < 2) {
+        this.compareError = "Pick at least 2 stores to compare.";
+        return;
+      }
+
+      this.compareLoading = true;
+      this.compareError = null;
+      try {
+        const params = new URLSearchParams();
+        for (const id of this.compareIds) params.append("ids", id);
+        params.set("sort", "RATING");
+        params.set("direction", "DESC");
+
+        const res = await this.apiFetch(`/api/stores/compare?${params.toString()}`);
+        if (!res.ok) {
+          this.compareError = await this.readError(res, "Compare failed");
+          this.compareStores = [];
+          return;
+        }
+
+        const data = await res.json();
+        this.compareStores = Array.isArray(data?.stores) ? data.stores : [];
+      } catch (e) {
+        this.compareError = e?.message || "Compare failed.";
+        this.compareStores = [];
+      } finally {
+        this.compareLoading = false;
       }
     },
 
@@ -157,13 +385,9 @@ function app() {
         params.set("radiusKm", String(this.radiusKm));
       }
 
-      const res = await fetch(`/api/stores/search?${params.toString()}`, {
-        headers: { "Accept": "application/json" },
-      });
-
+      const res = await this.apiFetch(`/api/stores/search?${params.toString()}`);
       if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        throw new Error(`Search failed (${res.status}): ${text || res.statusText}`);
+        throw new Error(await this.readError(res, "Search failed"));
       }
 
       const data = await res.json();
@@ -201,6 +425,7 @@ function app() {
       this.selectedDetail = null;
       this.reviews = [];
       this.profileError = null;
+      this.reviewNotice = null;
 
       try {
         const useGeo = Boolean(this.searchCenter && this.radiusKm > 0);
@@ -327,6 +552,9 @@ function app() {
       this.reviews = [];
       this.profileError = null;
       this.profileLoading = true;
+      this.reviewNotice = null;
+      this.reviewComment = "";
+      this.reviewRating = 5;
 
       if (this.mapReady && this.map && store.lat != null && store.lng != null) {
         this.map.panTo({ lat: Number(store.lat), lng: Number(store.lng) });
@@ -340,21 +568,27 @@ function app() {
 
       try {
         const [detailRes, reviewsRes] = await Promise.all([
-          fetch(`/api/stores/${store.id}`, { headers: { "Accept": "application/json" } }),
-          fetch(`/api/stores/${store.id}/reviews`, { headers: { "Accept": "application/json" } }),
+          this.apiFetch(`/api/stores/${store.id}`),
+          this.apiFetch(`/api/stores/${store.id}/reviews`),
         ]);
 
         if (!detailRes.ok) {
-          const text = await detailRes.text().catch(() => "");
-          throw new Error(`Could not load store profile (${detailRes.status}): ${text || detailRes.statusText}`);
+          throw new Error(await this.readError(detailRes, "Could not load store profile"));
         }
         if (!reviewsRes.ok) {
-          const text = await reviewsRes.text().catch(() => "");
-          throw new Error(`Could not load reviews (${reviewsRes.status}): ${text || reviewsRes.statusText}`);
+          throw new Error(await this.readError(reviewsRes, "Could not load reviews"));
         }
 
         this.selectedDetail = await detailRes.json();
         this.reviews = await reviewsRes.json();
+
+        if (this.me?.id) {
+          const mine = this.reviews.find((r) => r?.userId === this.me.id);
+          if (mine) {
+            this.reviewRating = Number(mine.rating) || 5;
+            this.reviewComment = mine.comment || "";
+          }
+        }
       } catch (e) {
         this.selectedDetail = store;
         if (!silentErrors) {
@@ -362,6 +596,40 @@ function app() {
         }
       } finally {
         this.profileLoading = false;
+      }
+    },
+
+    async submitReview() {
+      const storeId = this.selected?.id;
+      if (!storeId) {
+        this.reviewNotice = "Pick a store first.";
+        return;
+      }
+
+      this.reviewSubmitting = true;
+      this.reviewNotice = null;
+      this.profileError = null;
+
+      try {
+        const res = await this.apiFetch(`/api/stores/${storeId}/reviews`, {
+          method: "POST",
+          body: {
+            rating: Number(this.reviewRating),
+            comment: (this.reviewComment || "").trim() || null,
+          },
+        });
+
+        if (!res.ok) {
+          this.profileError = await this.readError(res, "Could not submit review");
+          return;
+        }
+
+        this.reviewNotice = "Review saved.";
+        await this.selectStore(this.selected, { silentErrors: false });
+      } catch (e) {
+        this.profileError = e?.message || "Could not submit review.";
+      } finally {
+        this.reviewSubmitting = false;
       }
     },
   };

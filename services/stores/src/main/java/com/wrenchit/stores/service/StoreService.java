@@ -72,8 +72,8 @@ public class StoreService {
     @Transactional
     public StoreSearchResult search(StoreSearchCriteria criteria) {
         String query = criteria.getQuery();
-        int limit = criteria.getLimit();
-        int offset = criteria.getOffset();
+        int limit = Math.max(1, Math.min(criteria.getLimit(), 100));
+        int offset = Math.max(criteria.getOffset(), 0);
         Double lat = criteria.getLat();
         Double lng = criteria.getLng();
         Double radiusKm = criteria.getRadiusKm();
