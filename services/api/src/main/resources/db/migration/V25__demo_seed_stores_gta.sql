@@ -1,0 +1,46 @@
+insert into stores (
+    google_place_id,
+    name,
+    address,
+    city,
+    state,
+    postal_code,
+    country,
+    lat,
+    lng,
+    rating,
+    rating_count,
+    phone,
+    website,
+    services_text
+)
+values
+    ('demo-toronto-dt-001', 'Downtown Auto Care', '220 Yonge St', 'Toronto', 'ON', 'M5B 2H1', 'CA', 43.6544, -79.3807, 4.6, 128, '(416) 555-1101', 'https://downtownautocare.example', 'Oil change, brakes, tires, diagnostics'),
+    ('demo-toronto-northyork-001', 'North York Auto Works', '5100 Yonge St', 'Toronto', 'ON', 'M2N 5V7', 'CA', 43.7665, -79.4126, 4.5, 94, '(416) 555-2202', 'https://northyorkautoworks.example', 'A/C service, alignment, inspections'),
+    ('demo-toronto-scarborough-001', 'Scarborough Performance Garage', '300 Borough Dr', 'Toronto', 'ON', 'M1P 4P5', 'CA', 43.7757, -79.2577, 4.4, 211, '(416) 555-3303', 'https://scarboroughgarage.example', 'Brakes, suspension, engine repair'),
+    ('demo-etobicoke-001', 'Etobicoke Auto Service', '555 Rexdale Blvd', 'Toronto', 'ON', 'M9W 5L2', 'CA', 43.7166, -79.5893, 4.3, 76, '(416) 555-4404', 'https://etobicokeautoservice.example', 'Oil change, battery, electrical diagnostics'),
+    ('demo-mississauga-001', 'Mississauga Mechanic Centre', '100 City Centre Dr', 'Mississauga', 'ON', 'L5B 2C9', 'CA', 43.5890, -79.6441, 4.7, 159, '(905) 555-5505', 'https://mississaugamechanic.example', 'Transmission, brakes, cooling system'),
+    ('demo-brampton-001', 'Brampton Auto Clinic', '45 Peel Centre Dr', 'Brampton', 'ON', 'L6T 0E1', 'CA', 43.7284, -79.7086, 4.2, 81, '(905) 555-6606', 'https://bramptonautoclinic.example', 'A/C repair, tune-ups, tires'),
+    ('demo-vaughan-001', 'Vaughan Auto & Tire', '1 Bass Pro Mills Dr', 'Vaughan', 'ON', 'L4K 5W4', 'CA', 43.8231, -79.5393, 4.6, 133, '(905) 555-7707', 'https://vaughanauto.example', 'Tires, wheel alignment, brakes'),
+    ('demo-markham-001', 'Markham Garage', '169 Enterprise Blvd', 'Markham', 'ON', 'L6G 0E7', 'CA', 43.8486, -79.3349, 4.5, 101, '(905) 555-8808', 'https://markhamgarage.example', 'Engine diagnostics, emissions, suspension'),
+    ('demo-richmondhill-001', 'Richmond Hill Auto Hub', '9350 Yonge St', 'Richmond Hill', 'ON', 'L4C 5G2', 'CA', 43.8475, -79.4327, 4.4, 118, '(905) 555-9909', 'https://richmondhillautohub.example', 'Oil change, safety inspection, brake service'),
+    ('demo-pickering-001', 'Pickering Auto Repair', '1355 Kingston Rd', 'Pickering', 'ON', 'L1V 1B8', 'CA', 43.8345, -79.0849, 4.3, 87, '(905) 555-1010', 'https://pickeringautorepair.example', 'Cooling systems, batteries, alternators'),
+    ('demo-oakville-001', 'Oakville Auto Shop', '1225 Trafalgar Rd', 'Oakville', 'ON', 'L6H 2V2', 'CA', 43.4684, -79.6985, 4.6, 140, '(905) 555-1112', 'https://oakvilleauto.example', 'Hybrid service, brakes, diagnostics'),
+    ('demo-burlington-001', 'Burlington Boulevard Auto', '777 Guelph Line', 'Burlington', 'ON', 'L7R 3N2', 'CA', 43.3437, -79.8029, 4.5, 174, '(905) 555-1213', 'https://burlingtonboulevardauto.example', 'Oil change, transmission, tune-up'),
+    ('demo-ajax-001', 'Ajax Auto Collective', '248 Bayly St W', 'Ajax', 'ON', 'L1S 3V4', 'CA', 43.8502, -79.0204, 4.7, 162, '(905) 555-1415', 'https://ajaxautocollective.example', 'EV service, suspension, tire rotation')
+on conflict (google_place_id) do update
+set
+    name = excluded.name,
+    address = excluded.address,
+    city = excluded.city,
+    state = excluded.state,
+    postal_code = excluded.postal_code,
+    country = excluded.country,
+    lat = excluded.lat,
+    lng = excluded.lng,
+    rating = excluded.rating,
+    rating_count = excluded.rating_count,
+    phone = excluded.phone,
+    website = excluded.website,
+    services_text = excluded.services_text,
+    updated_at = now();
