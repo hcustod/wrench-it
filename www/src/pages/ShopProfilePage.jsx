@@ -1,31 +1,95 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { LuStar, LuMapPin, LuPhone, LuClock, LuArrowRight } from 'react-icons/lu';
 import { mockShops, mockServices, mockReviews } from '../data/mockData.js';
+import { getStore } from '../api/stores.js';
+import { listReviews } from '../api/reviews.js';
 import ReviewCard from '../components/review/ReviewCard.jsx';
-
-function getShopById(id) {
-  return mockShops.find((s) => s.id === id) ?? mockShops[0];
-}
-
-function getServicesByShopId(id) {
-  return mockServices.filter((svc) => svc.shopId === id);
-}
-
-function getReviewsByShopId(id) {
-  return mockReviews.filter((rev) => rev.shopId === id);
-}
 
 export default function ShopProfilePage() {
   const { id } = useParams();
   const [activeTab, setActiveTab] = useState('overview');
+  const [shop, setShop] = useState(null);
+  const [services, setServices] = useState([]);
+  const [customerReviews, setCustomerReviews] = useState([]);
+  const [mechanicReviews, setMechanicReviews] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  const shop = getShopById(id);
-  const services = getServicesByShopId(shop.id);
-  const reviews = getReviewsByShopId(shop.id);
+  useEffect(() => {
+    let cancelled = false;
 
-  const customerReviews = reviews.filter((r) => !r.isMechanicReview);
-  const mechanicReviews = reviews.filter((r) => r.isMechanicReview);
+    async function load() {
+      setLoading(true);
+      setError('');
+      try {
+        const [storeRes, reviewsRes] = await Promise.all([
+          getStore(id),
+          listReviews(id),
+        ]);
+        if (cancelled) return;
+
+        setShop(storeRes);
+
+        // services are not yet exposed via API; fall back to mock mapping if possible
+        const byId = mockServices.filter((svc) => svc.shopId === id);
+        const fallbackServices =
+          byId.length > 0
+            ? byId
+            : mockServices.filter((svc) => svc.shopId === 'shop-1');
+        setServices(fallbackServices);
+
+        const apiReviews = (reviewsRes ?? []).map((rev) => ({
+          id: rev.id,
+          reviewerName: 'Customer',
+          rating: rev.rating,
+          reviewText: rev.comment,
+          isVerified: true,
+          isMechanicReview: false,
+          date: rev.createdAt,
+        }));
+        setCustomerReviews(apiReviews);
+        setMechanicReviews([]);
+      } catch (err) {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : 'Failed to load shop details.');
+
+        // fallback to mock data to avoid a broken page
+        const mockShop = mockShops.find((s) => s.id === id) ?? mockShops[0];
+        setShop(mockShop);
+        setServices(mockServices.filter((svc) => svc.shopId === mockShop.id));
+        const mock = mockReviews.filter((rev) => rev.shopId === mockShop.id);
+        setCustomerReviews(mock.filter((r) => !r.isMechanicReview));
+        setMechanicReviews(mock.filter((r) => r.isMechanicReview));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    if (id) {
+      load();
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  if (loading && !shop) {
+    return (
+      <section className="mb-4">
+        <p className="wt-text-muted mb-0">Loading shop details…</p>
+      </section>
+    );
+  }
+
+  if (!shop) {
+    return (
+      <section className="mb-4">
+        <p className="wt-text-muted mb-0">Shop not found.</p>
+      </section>
+    );
+  }
 
   const fullStars = Math.floor(shop.rating ?? 0);
 
@@ -69,7 +133,7 @@ export default function ShopProfilePage() {
                 </div>
                 <div className="d-flex align-items-center gap-2">
                   <LuClock size={18} />
-                  <span>Open • Closes at 6:00 PM</span>
+                  <span>Hours information coming soon</span>
                 </div>
               </div>
             </div>
@@ -82,7 +146,7 @@ export default function ShopProfilePage() {
                 Get Directions
               </button>
               <Link
-                to="/write-review"
+                to={`/write-review?storeId=${shop.id}`}
                 className="btn btn-sm btn-wt-outline text-center"
               >
                 Write Review
@@ -126,6 +190,11 @@ export default function ShopProfilePage() {
 
           {/* Tab content */}
           <div className="p-4 p-md-5">
+            {error && (
+              <div className="small mb-3" style={{ color: '#FF8C42' }}>
+                {error}
+              </div>
+            )}
             {activeTab === 'overview' && (
               <div className="d-flex flex-column gap-4">
                 {/* About */}
@@ -261,7 +330,7 @@ export default function ShopProfilePage() {
                   <div className="d-flex justify-content-between align-items-center mb-3">
                     <h3 className="h5 text-white mb-0">Client Reviews</h3>
                     <Link
-                      to="/write-review"
+                      to={`/write-review?storeId=${shop.id}`}
                       className="btn btn-sm btn-wt-outline"
                     >
                       Write Review

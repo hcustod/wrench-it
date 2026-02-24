@@ -1,13 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { LuMapPin, LuSearch, LuMap, LuSlidersHorizontal, LuStar } from 'react-icons/lu';
-import { mockShops } from '../data/mockData.js';
+import { searchStores } from '../api/stores.js';
 import ShopCard from '../components/shop/ShopCard.jsx';
-
-function getStores() {
-  // TODO: later replace with real API call
-  return mockShops;
-}
 
 const CATEGORIES = [
   'All Services',
@@ -34,6 +29,9 @@ export default function SearchPage() {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [priceRange, setPriceRange] = useState('all');
   const [sortBy, setSortBy] = useState('best');
+  const [stores, setStores] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   function handleTopSearch(e) {
     e.preventDefault();
@@ -41,7 +39,6 @@ export default function SearchPage() {
     if (location.trim()) next.set('location', location.trim());
     if (searchTerm.trim()) next.set('service', searchTerm.trim());
     setSearchParams(next);
-    // filtering is still mock-based; params kept for future API use
   }
 
   function handleResetFilters() {
@@ -52,8 +49,38 @@ export default function SearchPage() {
     setSortBy('best');
   }
 
-  const stores = useMemo(() => {
-    let items = getStores();
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      setLoading(true);
+      setError('');
+      try {
+        const qService = searchParams.get('service') ?? '';
+        const qLocation = searchParams.get('location') ?? '';
+        const q = [qService, qLocation].filter(Boolean).join(' ');
+        const response = await searchStores({ q });
+        if (!cancelled) {
+          setStores(response?.items ?? []);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Failed to load shops.');
+          setStores([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [searchParams]);
+
+  const filteredStores = useMemo(() => {
+    let items = stores;
 
     // simple text search on name/services
     if (searchTerm.trim()) {
@@ -75,7 +102,6 @@ export default function SearchPage() {
       items = items.filter((s) => s.priceRange === priceRange);
     }
 
-    // category
     if (selectedCategory !== 'all') {
       const catToken = selectedCategory.replace('-', ' ').toLowerCase();
       items = items.filter((s) =>
@@ -106,9 +132,9 @@ export default function SearchPage() {
     }
 
     return sorted;
-  }, [searchTerm, minRating, priceRange, selectedCategory, sortBy]);
+  }, [stores, searchTerm, minRating, priceRange, selectedCategory, sortBy]);
 
-  const resultsCount = stores.length;
+  const resultsCount = filteredStores.length;
 
   return (
     <>
@@ -296,10 +322,23 @@ export default function SearchPage() {
             </div>
 
             {/* Shop Cards */}
+            {loading && (
+              <p className="wt-text-muted small mb-2">Loading shops…</p>
+            )}
+            {error && !loading && (
+              <p className="small mb-2" style={{ color: '#FF8C42' }}>
+                {error}
+              </p>
+            )}
             <div className="d-flex flex-column gap-3 mb-4">
-              {stores.map((shop) => (
+              {filteredStores.map((shop) => (
                 <ShopCard key={shop.id} {...shop} />
               ))}
+              {!loading && !error && filteredStores.length === 0 && (
+                <p className="wt-text-muted small mb-0">
+                  No shops match your current filters.
+                </p>
+              )}
             </div>
 
             {/* Map Section */}

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { LuStar, LuUpload, LuInfo } from 'react-icons/lu';
 import { mockShops, mockServices } from '../data/mockData.js';
+import { submitReview } from '../api/reviews.js';
 
 function getShopFromQuery(searchParams) {
   const shopId = searchParams.get('shopId');
@@ -30,7 +31,7 @@ export default function WriteReviewPage() {
     }
   }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     setError('');
     setSuccess('');
@@ -40,8 +41,27 @@ export default function WriteReviewPage() {
       return;
     }
 
-    // Mock submit
-    setSuccess('Review submitted for verification (mock).');
+    const storeId = searchParams.get('storeId');
+
+    // If we don't yet know the real store ID (e.g. coming from mock-only flows),
+    // keep the behavior mock-only so we don't send invalid IDs to the API.
+    if (!storeId) {
+      setSuccess('Review submitted for verification (mock).');
+      return;
+    }
+
+    try {
+      await submitReview(storeId, { rating, comment: reviewText.trim() });
+      setSuccess('Review submitted for verification.');
+    } catch (err) {
+      if (err && typeof err === 'object' && 'status' in err && err.status === 401) {
+        setError('You need to be logged in to submit a review.');
+      } else {
+        setError(
+          err instanceof Error ? err.message : 'Failed to submit review. Please try again.',
+        );
+      }
+    }
   }
 
   const displayShopName = shop?.name ?? 'Select a shop from search';

@@ -11,7 +11,10 @@ export async function apiFetch(path, options = {}) {
   const url = path.startsWith('/') ? BASE + path : BASE + '/' + path;
   const res = await fetch(url, { ...options, credentials: 'include' });
   if (!res.ok) {
-    throw new Error(`API error: ${res.status} ${res.statusText}`);
+    const error = new Error(`API error: ${res.status} ${res.statusText}`);
+    // surface HTTP status code for callers that need to branch on auth errors
+    error.status = res.status;
+    throw error;
   }
   return res.json();
 }

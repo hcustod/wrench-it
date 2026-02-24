@@ -1,17 +1,14 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { LuSearch, LuMapPin, LuBadgeCheck, LuDollarSign, LuShield } from 'react-icons/lu';
-import { mockShops } from '../data/mockData.js';
+import { searchStores } from '../api/stores.js';
 import ShopCard from '../components/shop/ShopCard.jsx';
-
-function getFeaturedShops() {
-  return mockShops.slice(0, 4);
-}
 
 export default function HomePage() {
   const navigate = useNavigate();
   const [location, setLocation] = useState('');
   const [service, setService] = useState('');
+  const [featuredShops, setFeaturedShops] = useState([]);
 
   function handleSearch(e) {
     if (e?.preventDefault) e.preventDefault();
@@ -22,7 +19,24 @@ export default function HomePage() {
     navigate(`/search${query ? `?${query}` : ''}`);
   }
 
-  const featuredShops = getFeaturedShops();
+  useEffect(() => {
+    let cancelled = false;
+    async function loadFeatured() {
+      try {
+        const response = await searchStores();
+        if (!cancelled) {
+          const items = response?.items ?? [];
+          setFeaturedShops(items.slice(0, 4));
+        }
+      } catch {
+        // keep existing empty state; backend team can refine handling later
+      }
+    }
+    loadFeatured();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { LuStar, LuClock, LuCalendar, LuHeart } from 'react-icons/lu';
 import {
@@ -7,6 +7,7 @@ import {
   mockSavedShops,
 } from '../data/mockData.js';
 import StatusBadge from '../components/common/StatusBadge.jsx';
+import { listSavedShops } from '../api/saved.js';
 
 function getMyReviews() {
   return mockUserReviews;
@@ -16,16 +17,58 @@ function getMyBookings() {
   return mockBookings;
 }
 
-function getMySavedShops() {
-  return mockSavedShops;
-}
-
 export default function UserDashboardPage() {
   const [activeTab, setActiveTab] = useState('reviews');
 
   const reviews = getMyReviews();
   const bookings = getMyBookings();
-  const savedShops = getMySavedShops();
+  const [savedShops, setSavedShops] = useState(mockSavedShops);
+  const [savedError, setSavedError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSaved() {
+      try {
+        const response = await listSavedShops();
+        if (cancelled) return;
+        const items = (response ?? [])
+          .filter((item) => item.store)
+          .map((item) => {
+            const store = item.store;
+            return {
+              id: store.id,
+              name: store.name,
+              rating: store.rating ?? 0,
+              reviewCount: store.ratingCount ?? 0,
+              location:
+                store.city && store.state
+                  ? `${store.city}, ${store.state}`
+                  : store.address,
+            };
+          });
+        if (items.length > 0) {
+          setSavedShops(items);
+        } else {
+          setSavedShops([]);
+        }
+        setSavedError('');
+      } catch (err) {
+        if (cancelled) return;
+        // fall back to mock data but surface that real API failed
+        setSavedShops(mockSavedShops);
+        setSavedError(
+          err instanceof Error ? err.message : 'Failed to load saved shops.',
+        );
+      }
+    }
+
+    loadSaved();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const upcomingBookings = bookings.filter((b) => b.status === 'upcoming');
   const pastBookings = bookings.filter((b) => b.status === 'completed');
@@ -230,6 +273,11 @@ export default function UserDashboardPage() {
                 <h3 className="h5 text-white mb-1">
                   Saved Shops ({savedShops.length})
                 </h3>
+                {savedError && (
+                  <p className="small" style={{ color: '#FF8C42' }}>
+                    {savedError}
+                  </p>
+                )}
                 {savedShops.map((shop) => (
                   <div
                     key={shop.id}
