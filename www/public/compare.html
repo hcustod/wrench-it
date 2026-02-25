@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>WrenchIT Demo | Compare</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <script>
+    window.WRENCHIT_CONFIG = {
+      googleMapsApiKey: "",
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body data-page="compare" x-data="app()" x-init="initPage('compare')">
+  <header class="topbar appTopbar">
+    <div class="brandBlock">
+      <div class="brand">WrenchIT</div>
+      <div class="brandSub">Marketplace Demo</div>
+    </div>
+
+    <nav class="mainNav" aria-label="Primary">
+      <a class="navBtn" :class="{ active: isPage('explore') }" :aria-current="isPage('explore') ? 'page' : null" href="/index.html">Explore</a>
+      <a class="navBtn" :class="{ active: isPage('compare') }" :aria-current="isPage('compare') ? 'page' : null" href="/compare.html">Compare</a>
+      <a class="navBtn" :class="{ active: isPage('saved') }" :aria-current="isPage('saved') ? 'page' : null" href="/saved.html">Saved</a>
+      <a class="navBtn" :class="{ active: isPage('receipts') }" :aria-current="isPage('receipts') ? 'page' : null" href="/receipts.html">Receipts</a>
+      <a class="navBtn" :class="{ active: isPage('profile') }" :aria-current="isPage('profile') ? 'page' : null" href="/profile.html">Profile</a>
+    </nav>
+
+    <div class="right">
+      <button class="btn ghost small" @click="ping()" :disabled="pinging">
+        <span x-show="!pinging">Ping API</span>
+        <span x-show="pinging">Pinging...</span>
+      </button>
+      <span class="pill" x-text="apiOk ? 'API OK' : 'API ?'"></span>
+      <span class="pill" x-text="hasAuthToken() ? 'Token Set' : 'No Token'"></span>
+    </div>
+  </header>
+
+  <main class="pageContainer" :class="{ compact: userSettings?.compactMode }">
+    <section class="pageIntro">
+      <div class="pageHeader">
+        <div class="introText">
+          <h1>Compare Shops</h1>
+          <p>Build a shortlist of up to 4 stores, then run a server-side compare for ratings and review volume.</p>
+        </div>
+        <div class="row controls">
+          <button class="btn" @click="runCompare()" :disabled="compareLoading || compareIds.length < 2">
+            <span x-show="!compareLoading">Run Compare</span>
+            <span x-show="compareLoading">Comparing...</span>
+          </button>
+          <button class="btn ghost" @click="clearCompare()" :disabled="compareIds.length === 0">Clear</button>
+          <span class="pill" x-text="`${compareIds.length}/4 selected`"></span>
+        </div>
+      </div>
+      <div class="metricRow">
+        <div class="metricCard">
+          <div class="card-sub">Queue Size</div>
+          <div class="metricValue" x-text="compareIds.length"></div>
+        </div>
+        <div class="metricCard">
+          <div class="card-sub">Search Pool</div>
+          <div class="metricValue" x-text="results.length"></div>
+        </div>
+        <div class="metricCard">
+          <div class="card-sub">Compared</div>
+          <div class="metricValue" x-text="compareStores.length"></div>
+        </div>
+      </div>
+    </section>
+
+    <template x-if="compareError"><div class="error" x-text="compareError"></div></template>
+
+    <section class="pageGrid twoCol">
+      <section class="panel">
+        <div class="sectionTitle">Pick Stores</div>
+        <div class="row controls">
+          <input class="input" placeholder="Search list to add stores..." x-model="q" @keydown.enter.prevent="search({ selectFirst: false })" />
+          <button class="btn ghost" @click="search({ selectFirst: false })" :disabled="loading">
+            <span x-show="!loading">Refresh</span>
+            <span x-show="loading">Searching...</span>
+          </button>
+        </div>
+
+        <div class="results">
+          <template x-for="s in results" :key="`cmp-${s.id || s.placeId || s.name}`">
+            <div class="card" :class="{ active: isCompareSelected(s.id) }">
+              <div class="card-title">
+                <span x-text="s.name ?? 'Store'"></span>
+                <span class="badge" x-show="s.rating != null" x-text="Number(s.rating).toFixed(1)"></span>
+              </div>
+              <div class="card-sub" x-text="formatLoc(s)"></div>
+              <div class="row cardActions">
+                <button class="btn ghost small" @click.stop="toggleCompare(s)" :disabled="!s.id">
+                  <span x-text="isCompareSelected(s.id) ? 'Remove' : 'Add'"></span>
+                </button>
+                <button class="btn ghost small" @click.stop="s.id && goToPage('explore', { storeId: s.id })" :disabled="!s.id">Open</button>
+              </div>
+            </div>
+          </template>
+          <div class="empty" x-show="!loading && results.length === 0">No stores loaded yet.</div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="sectionTitle">Compare Results</div>
+        <div class="empty" x-show="compareStores.length === 0 && !compareLoading">Select at least 2 stores, then run compare.</div>
+        <div class="tableWrap" x-show="compareStores.length > 0">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Reviews Avg</th>
+                <th>Review Count</th>
+                <th>Google Rating</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="s in compareStores" :key="s.id">
+                <tr>
+                  <td x-text="s.name || '--'"></td>
+                  <td x-text="s.reviews ? Number(s.reviews.averageRating).toFixed(1) : '--'"></td>
+                  <td x-text="s.reviews ? s.reviews.reviewCount : 0"></td>
+                  <td x-text="s.rating != null ? Number(s.rating).toFixed(1) : '--'"></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>

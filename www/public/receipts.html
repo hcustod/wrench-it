@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>WrenchIT Demo | Receipts</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <script>
+    window.WRENCHIT_CONFIG = {
+      googleMapsApiKey: "",
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body data-page="receipts" x-data="app()" x-init="initPage('receipts')">
+  <header class="topbar appTopbar">
+    <div class="brandBlock">
+      <div class="brand">WrenchIT</div>
+      <div class="brandSub">Marketplace Demo</div>
+    </div>
+
+    <nav class="mainNav" aria-label="Primary">
+      <a class="navBtn" :class="{ active: isPage('explore') }" :aria-current="isPage('explore') ? 'page' : null" href="/index.html">Explore</a>
+      <a class="navBtn" :class="{ active: isPage('compare') }" :aria-current="isPage('compare') ? 'page' : null" href="/compare.html">Compare</a>
+      <a class="navBtn" :class="{ active: isPage('saved') }" :aria-current="isPage('saved') ? 'page' : null" href="/saved.html">Saved</a>
+      <a class="navBtn" :class="{ active: isPage('receipts') }" :aria-current="isPage('receipts') ? 'page' : null" href="/receipts.html">Receipts</a>
+      <a class="navBtn" :class="{ active: isPage('profile') }" :aria-current="isPage('profile') ? 'page' : null" href="/profile.html">Profile</a>
+    </nav>
+
+    <div class="right">
+      <button class="btn ghost small" @click="ping()" :disabled="pinging">
+        <span x-show="!pinging">Ping API</span>
+        <span x-show="pinging">Pinging...</span>
+      </button>
+      <span class="pill" x-text="apiOk ? 'API OK' : 'API ?'"></span>
+      <span class="pill" x-text="hasAuthToken() ? 'Token Set' : 'No Token'"></span>
+    </div>
+  </header>
+
+  <main class="pageContainer" :class="{ compact: userSettings?.compactMode }">
+    <section class="pageIntro">
+      <div class="pageHeader">
+        <div class="introText">
+          <h1>Receipt Validation Lab</h1>
+          <p>Drive receipt triage workflow with static records and persisted local status updates.</p>
+        </div>
+      </div>
+      <div class="metricRow">
+        <div class="metricCard">
+          <div class="card-sub">Pending</div>
+          <div class="metricValue" x-text="pendingReceiptsCount()"></div>
+        </div>
+        <div class="metricCard">
+          <div class="card-sub">Approved</div>
+          <div class="metricValue" x-text="approvedReceiptsCount()"></div>
+        </div>
+        <div class="metricCard">
+          <div class="card-sub">Filtered Rows</div>
+          <div class="metricValue" x-text="filteredReceiptsCount()"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="row controls">
+        <input class="input" placeholder="Filter receipts by id/store/user/issue..." x-model="receiptFilterQuery" />
+        <label class="inlineField">
+          <span>Status</span>
+          <select class="input compact wideCompact" x-model="receiptFilterStatus">
+            <option value="ALL">All</option>
+            <option value="PENDING">Pending</option>
+            <option value="APPROVED">Approved</option>
+            <option value="REJECTED">Rejected</option>
+          </select>
+        </label>
+        <button class="btn ghost" @click="resetMockReceipts()">Reset Mock Data</button>
+      </div>
+
+      <div class="tableWrap">
+        <table class="table compactTable">
+          <thead>
+            <tr>
+              <th>Receipt</th>
+              <th>Store</th>
+              <th>Amount</th>
+              <th>Status</th>
+              <th>Issue</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="r in filteredMockReceipts()" :key="r.id">
+              <tr>
+                <td>
+                  <div x-text="r.id"></div>
+                  <div class="card-sub" x-text="formatDate(r.uploadedAt)"></div>
+                </td>
+                <td>
+                  <div x-text="r.storeName"></div>
+                  <div class="card-sub" x-text="r.submittedBy"></div>
+                </td>
+                <td x-text="formatMoney(r.amount)"></td>
+                <td>
+                  <span class="statusBadge" :class="{ warn: r.status === 'PENDING', ok: r.status === 'APPROVED', bad: r.status === 'REJECTED' }" x-text="r.status"></span>
+                </td>
+                <td x-text="r.issue || '--'"></td>
+                <td>
+                  <div class="row">
+                    <button class="btn ghost small" @click="markReceiptStatus(r.id, 'PENDING')">Pending</button>
+                    <button class="btn ghost small" @click="markReceiptStatus(r.id, 'APPROVED')">Approve</button>
+                    <button class="btn ghost small" @click="markReceiptStatus(r.id, 'REJECTED')">Reject</button>
+                  </div>
+                </td>
+              </tr>
+            </template>
+            <tr x-show="filteredReceiptsCount() === 0">
+              <td colspan="6" class="empty">No mock receipts match your filters.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="notice" x-show="receiptNotice" x-text="receiptNotice"></div>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>

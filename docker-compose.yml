@@ -1,0 +1,134 @@
+services:
+  # Auth db (spring auth db)
+  db_auth:
+    image: postgres:15
+    container_name: wrenchit-postgres-auth
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_AUTH_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_AUTH_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_AUTH_DB}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_auth_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_AUTH_USER} -d ${POSTGRES_AUTH_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+
+  # App db
+  db_app:
+    image: postgres:15
+    container_name: wrenchit-postgres-app
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_APP_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_APP_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_APP_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_app_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_APP_USER} -d ${POSTGRES_APP_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+
+  # Keycloak DB
+  db_keycloak:
+    image: postgres:15
+    container_name: wrenchit-postgres-keycloak
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_KC_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_KC_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_KC_DB}
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_kc_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_KC_USER} -d ${POSTGRES_KC_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:25.0
+    container_name: wrenchit-keycloak
+    depends_on:
+      db_keycloak:
+        condition: service_healthy
+    environment:
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://db_keycloak:5432/${POSTGRES_KC_DB}
+      KC_DB_USERNAME: ${POSTGRES_KC_USER}
+      KC_DB_PASSWORD: ${POSTGRES_KC_PASSWORD}
+
+      KC_HTTP_ENABLED: "true"
+      KC_HOSTNAME_STRICT: "false"
+
+      # Internal hostname used by other containers
+      KC_HOSTNAME: keycloak
+      KC_HOSTNAME_PORT: "8080"
+      KC_HOSTNAME_URL: http://keycloak:8080
+    ports:
+      - "8082:8080"
+    command: ["start-dev"]
+    restart: unless-stopped
+
+  clamav:
+    image: mkodockx/docker-clamav:alpine
+    container_name: wrenchit-clamav
+    ports:
+      - "${CLAMAV_PORT:-3310}:3310"
+    restart: unless-stopped
+
+  api:
+    image: maven:3.9.9-eclipse-temurin-21
+    container_name: wrenchit-api
+    working_dir: /workspace
+    ports:
+      - "8080:8080"
+    command:
+      - sh
+      - -lc
+      - ./mvnw -pl services/api -am -DskipTests install && ./mvnw -f services/api/pom.xml spring-boot:run
+    environment:
+      POSTGRES_APP_HOST: db_app
+      POSTGRES_APP_PORT: 5432
+      POSTGRES_APP_DB: ${POSTGRES_APP_DB}
+      POSTGRES_APP_USER: ${POSTGRES_APP_USER}
+      POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD}
+      WRENCHIT_SECURITY_AUTH_ENABLED: ${WRENCHIT_SECURITY_AUTH_ENABLED:-false}
+      WRENCHIT_GOOGLE_ENABLED: ${WRENCHIT_GOOGLE_ENABLED:-false}
+      GOOGLE_PLACES_API_KEY: ${GOOGLE_PLACES_API_KEY:-}
+    volumes:
+      - ./:/workspace
+      - maven_cache:/root/.m2
+    depends_on:
+      db_app:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
+
+  www:
+    build:
+      context: ./www
+    container_name: wrenchit-www
+    ports:
+      - "8081:80"
+    depends_on:
+      - api
+
+volumes:
+  postgres_auth_data:
+  postgres_app_data:
+  postgres_kc_data:
+  maven_cache:

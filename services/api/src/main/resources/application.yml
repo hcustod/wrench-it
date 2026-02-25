@@ -1,0 +1,40 @@
+server:
+  port: 8080
+
+spring:
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_APP_HOST:localhost}:${POSTGRES_APP_PORT:5432}/${POSTGRES_APP_DB:wrenchit_app}
+    username: ${POSTGRES_APP_USER:wrenchit}
+    password: ${POSTGRES_APP_PASSWORD:wrenchitpass}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+
+  flyway:
+    enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+# If your project reads this flag, keep it here too.
+wrenchit:
+  security:
+    auth:
+      enabled: ${WRENCHIT_SECURITY_AUTH_ENABLED:false}
+
+# Spring Security resource server (JWT) - points to Keycloak issuer.
+# IMPORTANT: inside Docker network Keycloak is "http://keycloak:8080"
+spring.security:
+  oauth2:
+    resourceserver:
+      jwt:
+        issuer-uri: http://keycloak:8080/realms/wrenchit
