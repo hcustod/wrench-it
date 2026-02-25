@@ -7,6 +7,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -29,6 +31,7 @@ import com.wrenchit.stores.repository.StoreRepository;
 public class StoreService {
 
     private static final double DEFAULT_SIMILARITY = 0.25;
+    private static final Logger log = LoggerFactory.getLogger(StoreService.class);
 
     private final StoreRepository storeRepository;
     private final PlacesClient placesClient;
@@ -98,25 +101,49 @@ public class StoreService {
                 total = storeRepository.countWithinRadius(lat, lng, radiusKm, minRating, servicesContains, city, state, hasWebsite, hasPhone);
             } else {
                 Sort sortSpec = toSort(criteria.getSort(), criteria.getDirection(), hasRadius);
-                Page<Store> page = storeRepository.findAll(PageRequest.of(Math.max(offset / limit, 0), limit, sortSpec));
-                stores = page.getContent();
-                total = page.getTotalElements();
+                int startPage = Math.max(offset / limit, 0);
+                int inPageOffset = Math.max(offset % limit, 0);
+
+                Page<Store> firstPage = storeRepository.findAll(PageRequest.of(startPage, limit, sortSpec));
+                total = firstPage.getTotalElements();
+
+                if (inPageOffset == 0) {
+                    stores = firstPage.getContent();
+                } else {
+                    stores = new ArrayList<>();
+                    List<Store> firstContent = firstPage.getContent();
+                    if (inPageOffset < firstContent.size()) {
+                        stores.addAll(firstContent.subList(inPageOffset, firstContent.size()));
+                    }
+                    if (stores.size() < limit) {
+                        Page<Store> nextPage = storeRepository.findAll(PageRequest.of(startPage + 1, limit, sortSpec));
+                        List<Store> nextContent = nextPage.getContent();
+                        int remaining = limit - stores.size();
+                        stores.addAll(nextContent.subList(0, Math.min(remaining, nextContent.size())));
+                    }
+                }
             }
-        } else if (!hasRadius && googlePlacesProperties.isEnabled()) {
-            List<PlaceSearchResult> places = placesClient.search(query, limit, openNow);
-            List<String> placeIds = new ArrayList<>();
-            for (PlaceSearchResult place : places) {
-                placeIds.add(place.getPlaceId());
-                upsertFromSearchResult(place);
+        } else if (!hasRadius && googlePlacesProperties.isEnabled() && hasGoogleApiKeyConfigured()) {
+            try {
+                List<PlaceSearchResult> places = placesClient.search(query, limit, openNow);
+                List<String> placeIds = new ArrayList<>();
+                for (PlaceSearchResult place : places) {
+                    placeIds.add(place.getPlaceId());
+                    upsertFromSearchResult(place);
+                }
+                if (placeIds.isEmpty()) {
+                    stores = List.of();
+                } else {
+                    List<Store> matched = storeRepository.findByGooglePlaceIdIn(placeIds);
+                    stores = sortByPlaceIdOrder(matched, placeIds);
+                    stores = filterLocalAttributes(stores, minRating, servicesContains, city, state, hasWebsite, hasPhone);
+                }
+                total = stores.size();
+            } catch (RuntimeException ex) {
+                log.warn("Google Places search failed; falling back to local search. query='{}'", query, ex);
+                stores = storeRepository.searchLocal(query, DEFAULT_SIMILARITY, minRating, servicesContains, city, state, hasWebsite, hasPhone, limit, offset);
+                total = storeRepository.countLocal(query, DEFAULT_SIMILARITY, minRating, servicesContains, city, state, hasWebsite, hasPhone);
             }
-            if (placeIds.isEmpty()) {
-                stores = List.of();
-            } else {
-                List<Store> matched = storeRepository.findByGooglePlaceIdIn(placeIds);
-                stores = sortByPlaceIdOrder(matched, placeIds);
-                stores = filterLocalAttributes(stores, minRating, servicesContains, city, state, hasWebsite, hasPhone);
-            }
-            total = stores.size();
         } else {
             if (hasRadius) {
                 stores = storeRepository.searchLocalWithinRadius(query, DEFAULT_SIMILARITY, lat, lng, radiusKm, minRating, servicesContains, city, state, hasWebsite, hasPhone, limit, offset);
@@ -201,6 +228,11 @@ public class StoreService {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private boolean hasGoogleApiKeyConfigured() {
+        String key = googlePlacesProperties.getApiKey();
+        return key != null && !key.isBlank();
     }
 
     private List<Store> filterLocalAttributes(List<Store> stores,

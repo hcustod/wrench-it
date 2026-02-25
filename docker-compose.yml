@@ -114,6 +114,8 @@ services:
     build:
       context: ./www
     container_name: wrenchit-www
+    environment:
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
     ports:
       - "8081:80"
     depends_on:
