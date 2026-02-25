@@ -22,7 +22,7 @@ It provides store search (including optional Google Places integration), reviews
 docker-compose up -d
 ```
 
-2) Run API service:
+2) Run API service (optional if not using the compose `api` container):
 ```
 ./mvnw -pl services/api -am spring-boot:run
 ```
@@ -31,6 +31,23 @@ docker-compose up -d
 ```
 ./mvnw -pl services/auth -am spring-boot:run
 ```
+
+Demo URLs:
+- Frontend: `http://localhost:8081`
+- API health: `http://localhost:8080/actuator/health`
+- Keycloak admin: `http://localhost:8082/admin`
+
+### Local Map Key (No .env Required)
+Use this when you want to keep the repo public and avoid exposing keys.
+
+1) Edit `www/public/config.js` and paste your browser Maps API key in `googleMapsApiKey`.
+
+2) Rebuild frontend container:
+```
+docker-compose up -d --build www
+```
+
+3) Open `http://localhost:8081/search`.
 
 ## Build
 Build all modules:

@@ -2,7 +2,18 @@ import { apiFetch } from './client.js';
 
 /**
  * GET /api/stores/search
- * @param {{ q?: string, limit?: number, offset?: number, sort?: string, direction?: string }} [params]
+ * @param {{
+ *  q?: string,
+ *  limit?: number,
+ *  offset?: number,
+ *  sort?: string,
+ *  direction?: string,
+ *  lat?: number,
+ *  lng?: number,
+ *  radiusKm?: number,
+ *  minRating?: number,
+ *  services?: string
+ * }} [params]
  * @returns {Promise<{ items: Array, limit: number, offset: number, total: number }>}
  */
 export function searchStores(params = {}) {
@@ -12,6 +23,13 @@ export function searchStores(params = {}) {
   if (typeof params.offset === 'number') search.set('offset', String(params.offset));
   if (params.sort) search.set('sort', params.sort);
   if (params.direction) search.set('direction', params.direction);
+  if (typeof params.lat === 'number') search.set('lat', String(params.lat));
+  if (typeof params.lng === 'number') search.set('lng', String(params.lng));
+  if (typeof params.radiusKm === 'number') search.set('radiusKm', String(params.radiusKm));
+  if (typeof params.minRating === 'number' && params.minRating > 0) {
+    search.set('minRating', String(params.minRating));
+  }
+  if (params.services) search.set('services', params.services);
 
   const qs = search.toString();
   return apiFetch(`/stores/search${qs ? `?${qs}` : ''}`);
@@ -40,4 +58,3 @@ export function compareStores(ids, options = {}) {
   const qs = search.toString();
   return apiFetch(`/stores/compare${qs ? `?${qs}` : ''}`);
 }
-
