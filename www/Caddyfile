@@ -2,16 +2,17 @@
   root * /srv
   encode gzip
 
-  @config path /config.js
-  header @config Content-Type application/javascript
-  respond @config "window.WRENCHIT_CONFIG = { googleMapsApiKey: \"{$GOOGLE_MAPS_API_KEY}\" };"
-
-  # API reverse proxy (keep as-is if already working)
-  handle_path /api/* {
+  handle /api/* {
     reverse_proxy api:8080
   }
 
-  # Serve static files + SPA fallback
-  try_files {path} /index.html
-  file_server
+  handle /config.js {
+    header Content-Type application/javascript
+    respond "window.WRENCHIT_CONFIG = { googleMapsApiKey: \"{$GOOGLE_MAPS_API_KEY}\" };"
+  }
+
+  handle {
+    try_files {path} /index.html
+    file_server
+  }
 }

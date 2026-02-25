@@ -102,6 +102,8 @@ minio-data/
 **/data/
 **/volumes/
 docker-compose.override.yml
+!www/src/data/
+!www/src/data/**
 
 ############################
 # Logs
