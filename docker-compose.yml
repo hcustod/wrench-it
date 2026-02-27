@@ -72,15 +72,17 @@ services:
       KC_DB_PASSWORD: ${POSTGRES_KC_PASSWORD}
 
       KC_HTTP_ENABLED: "true"
+      KC_HTTP_PORT: "8082"
       KC_HOSTNAME_STRICT: "false"
-
-      # Internal hostname used by other containers
+      # Keep issuer stable for docker-network validation from API container
       KC_HOSTNAME: keycloak
-      KC_HOSTNAME_PORT: "8080"
-      KC_HOSTNAME_URL: http://keycloak:8080
+      KC_HOSTNAME_PORT: "8082"
+      KC_HOSTNAME_URL: http://keycloak:8082
     ports:
-      - "8082:8080"
-    command: ["start-dev"]
+      - "8082:8082"
+    volumes:
+      - ./infra/keycloak/realm-import:/opt/keycloak/data/import:ro
+    command: ["start-dev", "--import-realm"]
     restart: unless-stopped
 
   clamav:
@@ -109,6 +111,9 @@ services:
       WRENCHIT_SECURITY_AUTH_ENABLED: ${WRENCHIT_SECURITY_AUTH_ENABLED:-false}
       WRENCHIT_GOOGLE_ENABLED: ${WRENCHIT_GOOGLE_ENABLED:-false}
       GOOGLE_PLACES_API_KEY: ${GOOGLE_PLACES_API_KEY:-}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-wrenchit-api-public}
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_ISSUER_URI:-http://keycloak:8082/realms/wrenchit}
+      KEYCLOAK_JWK_SET_URI: ${KEYCLOAK_JWK_SET_URI:-http://keycloak:8082/realms/wrenchit/protocol/openid-connect/certs}
     volumes:
       - ./:/workspace
       - maven_cache:/root/.m2
@@ -123,7 +128,7 @@ services:
       context: ./www
     container_name: wrenchit-www
     ports:
-      - "8081:80"
+      - "8083:80"
     depends_on:
       - api
 
@@ -132,3 +137,6 @@ volumes:
   postgres_app_data:
   postgres_kc_data:
   maven_cache:
+
+
+

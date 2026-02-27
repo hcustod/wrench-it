@@ -1,0 +1,76 @@
+{
+  "realm": "wrench-it-realm",
+  "enabled": true,
+  "displayName": "Wrench It Realm",
+  "roles": {
+    "realm": [
+      {
+        "name": "USER",
+        "description": "Standard API user role"
+      },
+      {
+        "name": "ADMIN",
+        "description": "Administrative API role"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "wrench-it-backend",
+      "name": "wrench-it-backend",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "bearerOnly": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": true,
+      "authorizationServicesEnabled": false,
+      "fullScopeAllowed": true,
+      "secret": "change-me-backend-client-secret",
+      "redirectUris": [],
+      "webOrigins": [],
+      "attributes": {
+        "access.token.lifespan": "900"
+      }
+    }
+  ],
+  "users": [
+    {
+      "username": "api-user",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "API",
+      "lastName": "User",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "userpass",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "USER"
+      ]
+    },
+    {
+      "username": "api-admin",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "API",
+      "lastName": "Admin",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "adminpass",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "USER",
+        "ADMIN"
+      ]
+    }
+  ]
+}

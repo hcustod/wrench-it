@@ -16,6 +16,15 @@ spring:
   flyway:
     enabled: true
 
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # MUST match the token's "iss"
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://keycloak:8082/realms/wrenchit}
+          # Optional if issuer-uri is correct, but keeping it explicit is fine
+          jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://keycloak:8082/realms/wrenchit/protocol/openid-connect/certs}
+
 management:
   endpoints:
     web:
@@ -25,16 +34,14 @@ management:
     health:
       show-details: always
 
-# If your project reads this flag, keep it here too.
 wrenchit:
   security:
-    auth:
-      enabled: ${WRENCHIT_SECURITY_AUTH_ENABLED:false}
-
-# Spring Security resource server (JWT) - points to Keycloak issuer.
-# IMPORTANT: inside Docker network Keycloak is "http://keycloak:8080"
-spring.security:
-  oauth2:
-    resourceserver:
-      jwt:
-        issuer-uri: http://keycloak:8080/realms/wrenchit
+    auth-enabled: ${WRENCHIT_SECURITY_AUTH_ENABLED:true}
+    keycloak:
+      client-id: ${KEYCLOAK_CLIENT_ID:wrenchit-api-public}
+logging:
+  level:
+    org.springframework.security: DEBUG
+    org.springframework.security.oauth2: DEBUG
+    org.springframework.security.oauth2.jwt: TRACE
+    org.springframework.security.oauth2.server.resource: TRACE
