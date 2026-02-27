@@ -6,11 +6,6 @@
     reverse_proxy api:8080
   }
 
-  handle /config.js {
-    header Content-Type application/javascript
-    respond "window.WRENCHIT_CONFIG = { googleMapsApiKey: \"{$GOOGLE_MAPS_API_KEY}\" };"
-  }
-
   handle {
     try_files {path} /index.html
     file_server

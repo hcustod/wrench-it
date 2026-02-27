@@ -5,15 +5,15 @@ services:
     container_name: wrenchit-postgres-auth
     restart: always
     environment:
-      POSTGRES_USER: ${POSTGRES_AUTH_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_AUTH_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_AUTH_DB}
+      POSTGRES_USER: ${POSTGRES_AUTH_USER:-wrenchit_auth_user}
+      POSTGRES_PASSWORD: ${POSTGRES_AUTH_PASSWORD:-wrenchitAuth123}
+      POSTGRES_DB: ${POSTGRES_AUTH_DB:-wrenchit_auth}
     ports:
       - "5433:5432"
     volumes:
       - postgres_auth_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_AUTH_USER} -d ${POSTGRES_AUTH_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_AUTH_USER:-wrenchit_auth_user} -d ${POSTGRES_AUTH_DB:-wrenchit_auth}"]
       interval: 5s
       timeout: 3s
       retries: 15
@@ -24,15 +24,15 @@ services:
     container_name: wrenchit-postgres-app
     restart: always
     environment:
-      POSTGRES_USER: ${POSTGRES_APP_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_APP_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_APP_DB}
+      POSTGRES_USER: ${POSTGRES_APP_USER:-wrenchit_app_user}
+      POSTGRES_PASSWORD: ${POSTGRES_APP_PASSWORD:-wrenchitApp123}
+      POSTGRES_DB: ${POSTGRES_APP_DB:-wrenchit_app}
     ports:
       - "5432:5432"
     volumes:
       - postgres_app_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_APP_USER} -d ${POSTGRES_APP_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_APP_USER:-wrenchit_app_user} -d ${POSTGRES_APP_DB:-wrenchit_app}"]
       interval: 5s
       timeout: 3s
       retries: 15
@@ -43,15 +43,15 @@ services:
     container_name: wrenchit-postgres-keycloak
     restart: always
     environment:
-      POSTGRES_USER: ${POSTGRES_KC_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_KC_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_KC_DB}
+      POSTGRES_USER: ${POSTGRES_KC_USER:-keycloak_user}
+      POSTGRES_PASSWORD: ${POSTGRES_KC_PASSWORD:-keycloakPass123}
+      POSTGRES_DB: ${POSTGRES_KC_DB:-keycloak}
     ports:
       - "5434:5432"
     volumes:
       - postgres_kc_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_KC_USER} -d ${POSTGRES_KC_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_KC_USER:-keycloak_user} -d ${POSTGRES_KC_DB:-keycloak}"]
       interval: 5s
       timeout: 3s
       retries: 15
@@ -63,13 +63,13 @@ services:
       db_keycloak:
         condition: service_healthy
     environment:
-      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN}
-      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
 
       KC_DB: postgres
-      KC_DB_URL: jdbc:postgresql://db_keycloak:5432/${POSTGRES_KC_DB}
-      KC_DB_USERNAME: ${POSTGRES_KC_USER}
-      KC_DB_PASSWORD: ${POSTGRES_KC_PASSWORD}
+      KC_DB_URL: jdbc:postgresql://db_keycloak:5432/${POSTGRES_KC_DB:-keycloak}
+      KC_DB_USERNAME: ${POSTGRES_KC_USER:-keycloak_user}
+      KC_DB_PASSWORD: ${POSTGRES_KC_PASSWORD:-keycloakPass123}
 
       # lets services call it as http://keycloak:8080 inside the compose network
       KC_HOSTNAME_STRICT: "false"
@@ -97,9 +97,9 @@ services:
     environment:
       POSTGRES_APP_HOST: db_app
       POSTGRES_APP_PORT: 5432
-      POSTGRES_APP_DB: ${POSTGRES_APP_DB}
-      POSTGRES_APP_USER: ${POSTGRES_APP_USER}
-      POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD}
+      POSTGRES_APP_DB: ${POSTGRES_APP_DB:-wrenchit_app}
+      POSTGRES_APP_USER: ${POSTGRES_APP_USER:-wrenchit_app_user}
+      POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD:-wrenchitApp123}
       WRENCHIT_SECURITY_AUTH_ENABLED: ${WRENCHIT_SECURITY_AUTH_ENABLED:-false}
       WRENCHIT_GOOGLE_ENABLED: ${WRENCHIT_GOOGLE_ENABLED:-false}
       GOOGLE_PLACES_API_KEY: ${GOOGLE_PLACES_API_KEY:-}
@@ -114,8 +114,6 @@ services:
     build:
       context: ./www
     container_name: wrenchit-www
-    environment:
-      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
     ports:
       - "8081:80"
     depends_on:
