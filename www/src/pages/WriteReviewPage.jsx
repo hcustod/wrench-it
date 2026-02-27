@@ -1,34 +1,73 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { LuStar, LuUpload, LuInfo } from 'react-icons/lu';
-import { mockShops, mockServices } from '../data/mockData.js';
+import { createReceipt } from '../api/receipts.js';
 import { submitReview } from '../api/reviews.js';
-
-function getShopFromQuery(searchParams) {
-  const shopId = searchParams.get('shopId');
-  if (!shopId) return null;
-  return mockShops.find((s) => s.id === shopId) ?? null;
-}
+import { getStore, listStoreServices } from '../api/stores.js';
 
 export default function WriteReviewPage() {
   const [searchParams] = useSearchParams();
-  const shop = getShopFromQuery(searchParams);
+  const storeId = searchParams.get('storeId') || searchParams.get('shopId') || '';
+
+  const [shop, setShop] = useState(null);
+  const [services, setServices] = useState([]);
+  const [loadingContext, setLoadingContext] = useState(false);
+  const [contextError, setContextError] = useState('');
 
   const [rating, setRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
   const [serviceId, setServiceId] = useState('');
   const [reviewText, setReviewText] = useState('');
+  const [receiptFile, setReceiptFile] = useState(null);
   const [fileName, setFileName] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadContext() {
+      if (!storeId) {
+        setShop(null);
+        setServices([]);
+        setContextError('');
+        return;
+      }
+
+      setLoadingContext(true);
+      setContextError('');
+      try {
+        const [storeRes, servicesRes] = await Promise.all([
+          getStore(storeId),
+          listStoreServices(storeId),
+        ]);
+        if (cancelled) return;
+        setShop(storeRes);
+        setServices(servicesRes ?? []);
+      } catch (err) {
+        if (cancelled) return;
+        setShop(null);
+        setServices([]);
+        setContextError(
+          err instanceof Error ? err.message : 'Failed to load shop or service data.',
+        );
+      } finally {
+        if (!cancelled) setLoadingContext(false);
+      }
+    }
+
+    loadContext();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [storeId]);
 
   function handleFileChange(e) {
-    const file = e.target.files?.[0];
-    if (file) {
-      setFileName(file.name);
-    } else {
-      setFileName('');
-    }
+    const file = e.target.files?.[0] ?? null;
+    setReceiptFile(file);
+    setFileName(file ? file.name : '');
   }
 
   async function handleSubmit(e) {
@@ -36,22 +75,37 @@ export default function WriteReviewPage() {
     setError('');
     setSuccess('');
 
+    if (!storeId) {
+      setError('Select a shop before submitting a review.');
+      return;
+    }
+
     if (!rating || !reviewText.trim()) {
       setError('Rating and review text are required.');
       return;
     }
 
-    const storeId = searchParams.get('storeId');
-
-    // If we don't yet know the real store ID (e.g. coming from mock-only flows),
-    // keep the behavior mock-only so we don't send invalid IDs to the API.
-    if (!storeId) {
-      setSuccess('Review submitted for verification (mock).');
-      return;
-    }
+    setSubmitting(true);
 
     try {
-      await submitReview(storeId, { rating, comment: reviewText.trim() });
+      let receiptId;
+
+      if (receiptFile) {
+        const receipt = await createReceipt({
+          file: receiptFile,
+          storeId,
+          currency: 'USD',
+        });
+        receiptId = receipt?.id;
+      }
+
+      await submitReview(storeId, {
+        rating,
+        comment: reviewText.trim(),
+        serviceId: serviceId || undefined,
+        receiptId,
+      });
+
       setSuccess('Review submitted for verification.');
     } catch (err) {
       if (err && typeof err === 'object' && 'status' in err && err.status === 401) {
@@ -61,10 +115,12 @@ export default function WriteReviewPage() {
           err instanceof Error ? err.message : 'Failed to submit review. Please try again.',
         );
       }
+    } finally {
+      setSubmitting(false);
     }
   }
 
-  const displayShopName = shop?.name ?? 'Select a shop from search';
+  const displayShopName = shop?.name ?? (storeId ? 'Loading shop...' : 'Select a shop from search');
 
   return (
     <>
@@ -75,6 +131,14 @@ export default function WriteReviewPage() {
 
       <section>
         <div className="wt-card" style={{ maxWidth: '720px', margin: '0 auto' }}>
+          {loadingContext && (
+            <div className="small mb-3 wt-text-muted">Loading shop data...</div>
+          )}
+          {contextError && (
+            <div className="small mb-3" style={{ color: '#FF8C42' }}>
+              {contextError}
+            </div>
+          )}
           {error && (
             <div className="small mb-3" style={{ color: '#FF8C42' }}>
               {error}
@@ -132,9 +196,10 @@ export default function WriteReviewPage() {
                 className="form-select wt-input"
                 value={serviceId}
                 onChange={(e) => setServiceId(e.target.value)}
+                disabled={!storeId || loadingContext}
               >
                 <option value="">Select a service</option>
-                {mockServices.map((svc) => (
+                {services.map((svc) => (
                   <option key={svc.id} value={svc.id}>
                     {svc.name}
                   </option>
@@ -220,9 +285,9 @@ export default function WriteReviewPage() {
               <button
                 type="submit"
                 className="btn btn-wt-primary flex-grow-1"
-                disabled={!rating || !reviewText.trim()}
+                disabled={!rating || !reviewText.trim() || !storeId || submitting}
               >
-                Submit Review
+                {submitting ? 'Submitting...' : 'Submit Review'}
               </button>
               <button
                 type="button"
@@ -232,6 +297,7 @@ export default function WriteReviewPage() {
                   setHoverRating(0);
                   setServiceId('');
                   setReviewText('');
+                  setReceiptFile(null);
                   setFileName('');
                   setError('');
                   setSuccess('');
@@ -246,4 +312,3 @@ export default function WriteReviewPage() {
     </>
   );
 }
-

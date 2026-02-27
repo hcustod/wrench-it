@@ -6,7 +6,7 @@ services:
     restart: always
     environment:
       POSTGRES_USER: ${POSTGRES_AUTH_USER:-wrenchit_auth_user}
-      POSTGRES_PASSWORD: ${POSTGRES_AUTH_PASSWORD:-wrenchitAuth123}
+      POSTGRES_PASSWORD: ${POSTGRES_AUTH_PASSWORD:?Set POSTGRES_AUTH_PASSWORD in .env}
       POSTGRES_DB: ${POSTGRES_AUTH_DB:-wrenchit_auth}
     ports:
       - "5433:5432"
@@ -25,7 +25,7 @@ services:
     restart: always
     environment:
       POSTGRES_USER: ${POSTGRES_APP_USER:-wrenchit_app_user}
-      POSTGRES_PASSWORD: ${POSTGRES_APP_PASSWORD:-wrenchitApp123}
+      POSTGRES_PASSWORD: ${POSTGRES_APP_PASSWORD:?Set POSTGRES_APP_PASSWORD in .env}
       POSTGRES_DB: ${POSTGRES_APP_DB:-wrenchit_app}
     ports:
       - "5432:5432"
@@ -44,7 +44,7 @@ services:
     restart: always
     environment:
       POSTGRES_USER: ${POSTGRES_KC_USER:-keycloak_user}
-      POSTGRES_PASSWORD: ${POSTGRES_KC_PASSWORD:-keycloakPass123}
+      POSTGRES_PASSWORD: ${POSTGRES_KC_PASSWORD:?Set POSTGRES_KC_PASSWORD in .env}
       POSTGRES_DB: ${POSTGRES_KC_DB:-keycloak}
     ports:
       - "5434:5432"
@@ -64,19 +64,27 @@ services:
         condition: service_healthy
     environment:
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
-      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?Set KEYCLOAK_ADMIN_PASSWORD in .env}
+      KEYCLOAK_DEMO_USER_PASSWORD: ${KEYCLOAK_DEMO_USER_PASSWORD:?Set KEYCLOAK_DEMO_USER_PASSWORD in .env}
+      KEYCLOAK_DEMO_ADMIN_PASSWORD: ${KEYCLOAK_DEMO_ADMIN_PASSWORD:?Set KEYCLOAK_DEMO_ADMIN_PASSWORD in .env}
 
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://db_keycloak:5432/${POSTGRES_KC_DB:-keycloak}
       KC_DB_USERNAME: ${POSTGRES_KC_USER:-keycloak_user}
-      KC_DB_PASSWORD: ${POSTGRES_KC_PASSWORD:-keycloakPass123}
+      KC_DB_PASSWORD: ${POSTGRES_KC_PASSWORD:?Set POSTGRES_KC_PASSWORD in .env}
 
-      # lets services call it as http://keycloak:8080 inside the compose network
+      KC_HTTP_PORT: "8082"
       KC_HOSTNAME_STRICT: "false"
       KC_HTTP_ENABLED: "true"
+      KC_HOSTNAME: keycloak
+      KC_HOSTNAME_PORT: "8082"
+      KC_HOSTNAME_URL: http://keycloak:8082
     ports:
-      - "8082:8080"
-    command: ["start-dev"]
+      - "8082:8082"
+    volumes:
+      - ./infra/keycloak/realm-import:/opt/keycloak/data/import-template:ro
+      - ./infra/keycloak/start-keycloak.sh:/opt/keycloak/start-keycloak.sh:ro
+    entrypoint: ["/bin/sh", "/opt/keycloak/start-keycloak.sh"]
     restart: unless-stopped
 
   clamav:
@@ -99,20 +107,39 @@ services:
       POSTGRES_APP_PORT: 5432
       POSTGRES_APP_DB: ${POSTGRES_APP_DB:-wrenchit_app}
       POSTGRES_APP_USER: ${POSTGRES_APP_USER:-wrenchit_app_user}
-      POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD:-wrenchitApp123}
-      WRENCHIT_SECURITY_AUTH_ENABLED: ${WRENCHIT_SECURITY_AUTH_ENABLED:-false}
-      WRENCHIT_GOOGLE_ENABLED: ${WRENCHIT_GOOGLE_ENABLED:-false}
+      POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD:?Set POSTGRES_APP_PASSWORD in .env}
+      WRENCHIT_SECURITY_AUTH_ENABLED: ${WRENCHIT_SECURITY_AUTH_ENABLED:-true}
+      WRENCHIT_GOOGLE_ENABLED: ${WRENCHIT_GOOGLE_ENABLED:-true}
       GOOGLE_PLACES_API_KEY: ${GOOGLE_PLACES_API_KEY:-}
+      WRENCHIT_RECEIPTS_STORAGE_PATH: /var/lib/wrenchit/receipts
+      WRENCHIT_CLAMAV_ENABLED: ${WRENCHIT_CLAMAV_ENABLED:-true}
+      WRENCHIT_CLAMAV_FAIL_CLOSED: ${WRENCHIT_CLAMAV_FAIL_CLOSED:-false}
+      CLAMAV_HOST: clamav
+      CLAMAV_PORT: 3310
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-wrenchit-api-public}
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_ISSUER_URI:-http://keycloak:8082/realms/wrenchit}
+      KEYCLOAK_JWK_SET_URI: ${KEYCLOAK_JWK_SET_URI:-http://keycloak:8082/realms/wrenchit/protocol/openid-connect/certs}
+      KEYCLOAK_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?Set KEYCLOAK_ADMIN_PASSWORD in .env}
+      KEYCLOAK_ADMIN_REALM: ${KEYCLOAK_ADMIN_REALM:-master}
+      KEYCLOAK_USER_ROLE: ${KEYCLOAK_USER_ROLE:-USER}
     volumes:
       - ./:/workspace
       - maven_cache:/root/.m2
+      - receipt_data:/var/lib/wrenchit/receipts
     depends_on:
       db_app:
         condition: service_healthy
+      keycloak:
+        condition: service_started
+      clamav:
+        condition: service_started
 
   www:
     build:
       context: ./www
+      args:
+        WRENCHIT_FRONTEND_GOOGLE_MAPS_API_KEY: ${WRENCHIT_FRONTEND_GOOGLE_MAPS_API_KEY:-Paste-Key-Here}
     container_name: wrenchit-www
     ports:
       - "8081:80"
@@ -124,3 +151,4 @@ volumes:
   postgres_app_data:
   postgres_kc_data:
   maven_cache:
+  receipt_data:

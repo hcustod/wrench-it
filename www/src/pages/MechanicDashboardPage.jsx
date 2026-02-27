@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   LuBadgeCheck,
@@ -6,33 +7,45 @@ import {
   LuStar,
   LuFileText,
 } from 'react-icons/lu';
-import {
-  mockPendingVerifications,
-  mockRecentVerified,
-} from '../data/mockData.js';
 import StatsCard from '../components/dashboard/StatsCard.jsx';
+import { getMechanicDashboard } from '../api/mechanic.js';
 
-function getPendingVerifications() {
-  return mockPendingVerifications;
-}
-
-function getRecentlyVerified() {
-  return mockRecentVerified;
-}
-
-function getMechanicStats(pending) {
-  return {
-    totalVerified: 247,
-    thisWeek: 18,
-    pendingReviews: pending.length,
-    reputation: 4.9,
-  };
-}
+const EMPTY_STATS = {
+  totalVerified: 0,
+  thisWeek: 0,
+  pendingReviews: 0,
+  reputation: 0,
+};
 
 export default function MechanicDashboardPage() {
-  const pendingVerifications = getPendingVerifications();
-  const recentlyVerified = getRecentlyVerified();
-  const stats = getMechanicStats(pendingVerifications);
+  const [stats, setStats] = useState(EMPTY_STATS);
+  const [pendingVerifications, setPendingVerifications] = useState([]);
+  const [recentlyVerified, setRecentlyVerified] = useState([]);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadDashboard() {
+      try {
+        const data = await getMechanicDashboard();
+        if (cancelled) return;
+        setStats(data?.stats ?? EMPTY_STATS);
+        setPendingVerifications(data?.pending ?? []);
+        setRecentlyVerified(data?.recent ?? []);
+        setError('');
+      } catch (err) {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : 'Failed to load mechanic dashboard.');
+      }
+    }
+
+    loadDashboard();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <>
@@ -55,6 +68,11 @@ export default function MechanicDashboardPage() {
         <p className="wt-text-muted mb-0">
           Review and verify customer reviews to keep the community trusted.
         </p>
+        {error && (
+          <p className="small mt-2 mb-0" style={{ color: '#FF8C42' }}>
+            {error}
+          </p>
+        )}
       </section>
 
       {/* Stats grid */}
@@ -64,7 +82,7 @@ export default function MechanicDashboardPage() {
             <StatsCard
               icon={LuBadgeCheck}
               label="Total Verified"
-              value={stats.totalVerified}
+              value={stats.totalVerified ?? 0}
               tone="accent"
             />
           </div>
@@ -72,7 +90,7 @@ export default function MechanicDashboardPage() {
             <StatsCard
               icon={LuTrendingUp}
               label="This Week"
-              value={stats.thisWeek}
+              value={stats.thisWeek ?? 0}
               tone="soft"
             />
           </div>
@@ -80,7 +98,7 @@ export default function MechanicDashboardPage() {
             <StatsCard
               icon={LuClock}
               label="Pending Reviews"
-              value={stats.pendingReviews}
+              value={stats.pendingReviews ?? 0}
               tone="default"
             />
           </div>
@@ -88,7 +106,7 @@ export default function MechanicDashboardPage() {
             <StatsCard
               icon={LuStar}
               label="Reputation Score"
-              value={`${stats.reputation.toFixed(1)} / 5.0`}
+              value={`${(stats.reputation ?? 0).toFixed(1)} / 5.0`}
               tone="success"
             />
           </div>
@@ -156,6 +174,9 @@ export default function MechanicDashboardPage() {
                 </div>
               </div>
             ))}
+            {pendingVerifications.length === 0 && (
+              <p className="wt-text-muted small mb-0">No pending verifications.</p>
+            )}
           </div>
         </div>
       </section>
@@ -200,10 +221,12 @@ export default function MechanicDashboardPage() {
                 </span>
               </div>
             ))}
+            {recentlyVerified.length === 0 && (
+              <p className="wt-text-muted small mb-0">No recent decisions yet.</p>
+            )}
           </div>
         </div>
       </section>
     </>
   );
 }
-

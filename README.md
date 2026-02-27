@@ -17,17 +17,23 @@ It provides store search (including optional Google Places integration), reviews
 - Docker (for Postgres/Keycloak)
 
 ## Quick Start
-1) Start infrastructure:
+1) Create your local secrets file:
+```
+cp .env.example .env
+```
+Update `.env` with your real passwords and runtime values. `.env` is git-ignored.
+
+2) Start infrastructure:
 ```
 docker-compose up -d
 ```
 
-2) Run API service (optional if not using the compose `api` container):
+3) Run API service (optional if not using the compose `api` container):
 ```
 ./mvnw -pl services/api -am spring-boot:run
 ```
 
-3) (Optional) Run auth service:
+4) (Optional) Run auth service:
 ```
 ./mvnw -pl services/auth -am spring-boot:run
 ```
@@ -37,10 +43,10 @@ Demo URLs:
 - API health: `http://localhost:8080/actuator/health`
 - Keycloak admin: `http://localhost:8082/admin`
 
-### Local Map Key (No .env Required)
-Use this when you want to keep the repo public and avoid exposing keys.
+### Local Map Key
+Browser maps keys are inherently public client-side keys. Keep them out of git by setting only in your local files/environment.
 
-1) Edit `www/public/config.js` and paste your browser Maps API key in `googleMapsApiKey`.
+1) Set `WRENCHIT_FRONTEND_GOOGLE_MAPS_API_KEY` in your local `.env`.
 
 2) Rebuild frontend container:
 ```
@@ -62,13 +68,19 @@ Build only API:
 
 ## Configuration
 Default configuration is in `services/api/src/main/resources/application.yml`.
+Runtime secrets are expected from your local `.env` (for docker-compose) or environment variables.
 
 Key env vars:
 - `POSTGRES_APP_HOST` (default `localhost`)
 - `POSTGRES_APP_PORT` (default `5432`)
 - `POSTGRES_APP_DB` (default `wrenchit_app`)
 - `POSTGRES_APP_USER` (default `wrenchit_app_user`)
-- `POSTGRES_APP_PASSWORD` (default `wrenchitApp123`)
+- `POSTGRES_APP_PASSWORD` (required)
+- `POSTGRES_AUTH_PASSWORD` (required for compose)
+- `POSTGRES_KC_PASSWORD` (required for compose)
+- `KEYCLOAK_ADMIN_PASSWORD` (required for compose)
+- `KEYCLOAK_DEMO_USER_PASSWORD` (required for realm import)
+- `KEYCLOAK_DEMO_ADMIN_PASSWORD` (required for realm import)
 - `GOOGLE_PLACES_API_KEY` (optional)
 
 Google Places integration (disabled by default):

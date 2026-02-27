@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   LuStar,
@@ -6,45 +7,56 @@ import {
   LuSettings2,
   LuDollarSign,
 } from 'react-icons/lu';
-import { mockRecentReviews } from '../data/mockData.js';
 import StatsCard from '../components/dashboard/StatsCard.jsx';
+import { getMyShopDashboard } from '../api/shop.js';
 
-function getRecentReviews() {
-  return mockRecentReviews;
-}
+const EMPTY_SHOP_PROFILE = {
+  name: 'Your Shop',
+  rating: 0,
+  reviewCount: 0,
+  location: 'Unknown location',
+  phone: '-',
+};
 
-function getShopStats(recentReviews, topServices) {
-  const totalReviews = 247;
-  const averageRating = 4.8;
-  const monthlyViews = 1234;
-  const activeServices = topServices.length;
-
-  return {
-    totalReviews,
-    averageRating,
-    monthlyViews,
-    activeServices,
-  };
-}
+const EMPTY_STATS = {
+  averageRating: 0,
+  totalReviews: 0,
+  monthlyViews: 0,
+  activeServices: 0,
+};
 
 export default function ShopOwnerDashboardPage() {
-  const shopProfile = {
-    name: 'Premium Auto Care',
-    rating: 4.8,
-    reviewCount: 247,
-    location: 'Downtown, Los Angeles',
-    phone: '(323) 555-0123',
-  };
+  const [shopProfile, setShopProfile] = useState(EMPTY_SHOP_PROFILE);
+  const [stats, setStats] = useState(EMPTY_STATS);
+  const [topServices, setTopServices] = useState([]);
+  const [recentReviews, setRecentReviews] = useState([]);
+  const [error, setError] = useState('');
 
-  const topServices = [
-    { name: 'Oil Change', count: 89, revenue: '$4,005' },
-    { name: 'Brake Repair', count: 45, revenue: '$12,600' },
-    { name: 'Engine Diagnostics', count: 34, revenue: '$3,230' },
-    { name: 'Tire Service', count: 28, revenue: '$2,240' },
-  ];
+  useEffect(() => {
+    let cancelled = false;
 
-  const recentReviews = getRecentReviews();
-  const stats = getShopStats(recentReviews, topServices);
+    async function loadDashboard() {
+      try {
+        const data = await getMyShopDashboard();
+        if (cancelled) return;
+
+        setShopProfile(data?.shopProfile ?? EMPTY_SHOP_PROFILE);
+        setStats(data?.stats ?? EMPTY_STATS);
+        setTopServices(data?.topServices ?? []);
+        setRecentReviews(data?.recentReviews ?? []);
+        setError('');
+      } catch (err) {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : 'Failed to load shop dashboard.');
+      }
+    }
+
+    loadDashboard();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <>
@@ -54,6 +66,11 @@ export default function ShopOwnerDashboardPage() {
         <p className="wt-text-muted mb-0">
           Manage your shop profile, services, and customer reviews.
         </p>
+        {error && (
+          <p className="small mt-2 mb-0" style={{ color: '#FF8C42' }}>
+            {error}
+          </p>
+        )}
       </section>
 
       {/* Stats grid */}
@@ -63,7 +80,7 @@ export default function ShopOwnerDashboardPage() {
             <StatsCard
               icon={LuStar}
               label="Average Rating"
-              value={`${stats.averageRating.toFixed(1)} / 5.0`}
+              value={`${Number(stats.averageRating ?? 0).toFixed(1)} / 5.0`}
               tone="accent"
             />
           </div>
@@ -71,7 +88,7 @@ export default function ShopOwnerDashboardPage() {
             <StatsCard
               icon={LuMessageSquare}
               label="Total Reviews"
-              value={stats.totalReviews}
+              value={stats.totalReviews ?? 0}
               tone="soft"
             />
           </div>
@@ -79,7 +96,7 @@ export default function ShopOwnerDashboardPage() {
             <StatsCard
               icon={LuTrendingUp}
               label="Monthly Views"
-              value={stats.monthlyViews.toLocaleString()}
+              value={Number(stats.monthlyViews ?? 0).toLocaleString()}
               tone="success"
             />
           </div>
@@ -87,7 +104,7 @@ export default function ShopOwnerDashboardPage() {
             <StatsCard
               icon={LuDollarSign}
               label="Active Services"
-              value={stats.activeServices}
+              value={stats.activeServices ?? 0}
               tone="default"
             />
           </div>
@@ -120,25 +137,25 @@ export default function ShopOwnerDashboardPage() {
               <div className="d-flex flex-column gap-3">
                 <div className="d-flex justify-content-between align-items-center py-2 border-bottom border-opacity-25 border-secondary">
                   <span className="wt-text-muted small">Shop name</span>
-                  <span className="text-white">{shopProfile.name}</span>
+                  <span className="text-white">{shopProfile.name ?? '-'}</span>
                 </div>
                 <div className="d-flex justify-content-between align-items-center py-2 border-bottom border-opacity-25 border-secondary">
                   <span className="wt-text-muted small">Rating</span>
                   <div className="d-flex align-items-center gap-2">
                     <LuStar size={16} style={{ color: '#FF8C42', fill: '#FF8C42' }} />
-                    <span className="text-white">{shopProfile.rating.toFixed(1)}</span>
+                    <span className="text-white">{Number(shopProfile.rating ?? 0).toFixed(1)}</span>
                     <span className="wt-text-muted small">
-                      ({shopProfile.reviewCount} reviews)
+                      ({shopProfile.reviewCount ?? 0} reviews)
                     </span>
                   </div>
                 </div>
                 <div className="d-flex justify-content-between align-items-center py-2 border-bottom border-opacity-25 border-secondary">
                   <span className="wt-text-muted small">Location</span>
-                  <span className="text-white">{shopProfile.location}</span>
+                  <span className="text-white">{shopProfile.location ?? '-'}</span>
                 </div>
                 <div className="d-flex justify-content-between align-items-center py-2">
                   <span className="wt-text-muted small">Phone</span>
-                  <span className="text-white">{shopProfile.phone}</span>
+                  <span className="text-white">{shopProfile.phone ?? '-'}</span>
                 </div>
               </div>
             </div>
@@ -174,12 +191,15 @@ export default function ShopOwnerDashboardPage() {
                     <div>
                       <p className="text-white mb-1">{service.name}</p>
                       <p className="wt-text-muted small mb-0">
-                        {service.count} services this month
+                        {service.count ?? 0} services this month
                       </p>
                     </div>
-                    <p className="mb-0 text-white">{service.revenue}</p>
+                    <p className="mb-0 text-white">{service.revenue ?? '$0'}</p>
                   </div>
                 ))}
+                {topServices.length === 0 && (
+                  <p className="wt-text-muted small mb-0">No service activity yet.</p>
+                )}
               </div>
             </div>
 
@@ -226,6 +246,9 @@ export default function ShopOwnerDashboardPage() {
                     <p className="wt-text-muted small mb-0">{review.reviewText}</p>
                   </div>
                 ))}
+                {recentReviews.length === 0 && (
+                  <p className="wt-text-muted small mb-0">No recent reviews yet.</p>
+                )}
               </div>
             </div>
           </div>
@@ -285,4 +308,3 @@ export default function ShopOwnerDashboardPage() {
     </>
   );
 }
-

@@ -14,14 +14,13 @@ Modern React/Vite frontend for the WrenchIT platform – a marketplace to help d
 - **API layer**:
   - Central `src/api/client.js` using `fetch` with `credentials: 'include'` and `/api` base path
   - Domain modules in `src/api/*.js` (`stores`, `reviews`, `saved`, etc.)
-- **Mock data**: `src/data/mockData.js` for pages that do not yet have backend endpoints
 
 ### Key features (frontend)
 
 - **Public pages**: Home, search, shop profile, price comparison, login/register, not found
-- **Review flows**: Write review, review verification dashboard (mocked), user dashboard for reviews/bookings/saved shops
-- **Dashboards**: User dashboard plus mechanic, shop-owner, and admin dashboards (UI implemented; some data still mock-only)
-- **Management screens**: Manage shop info and services for shop owners (currently working entirely off local state)
+- **Review flows**: Write review, review verification dashboard, user dashboard for reviews/bookings/saved shops
+- **Dashboards**: User dashboard plus mechanic, shop-owner, and admin dashboards wired to backend endpoints
+- **Management screens**: Manage shop info and services for shop owners via `/api/shop/me/*`
 
 ### Project structure (high level)
 
@@ -31,7 +30,6 @@ Modern React/Vite frontend for the WrenchIT platform – a marketplace to help d
 - `src/pages/` – route-level pages (HomePage, SearchPage, ShopProfilePage, dashboards, auth, management, etc.)
 - `src/components/` – shared UI components (layout, cards, review widgets, status badges)
 - `src/api/` – API client and domain-specific modules
-- `src/data/mockData.js` – mock fixtures for shops, services, reviews, dashboards
 
 ### Prerequisites
 

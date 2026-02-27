@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   LuStar,
@@ -7,56 +7,147 @@ import {
   LuCircleAlert,
   LuCircleX,
 } from 'react-icons/lu';
+import {
+  decideMechanicReceipt,
+  getMechanicReceipt,
+  getMechanicReceiptFile,
+} from '../api/mechanic.js';
 
-const mockPendingReviews = [
-  {
-    id: '1',
-    shopName: 'Premium Auto Care',
-    customerName: 'Jessica Martinez',
-    rating: 5,
-    service: 'Oil Change',
-    reviewText:
-      'Fast and professional service. In and out in 30 minutes. The staff was friendly and explained everything clearly. Price was exactly as quoted. Great experience!',
-    date: 'November 20, 2025',
-    hasReceipt: true,
-    receiptDetails: {
-      amount: '$45.00',
-      date: 'November 20, 2025',
-      service: 'Conventional Oil Change',
-      fileName: 'receipt-2025-11-20.pdf',
-    },
-  },
-];
-
-function getPendingReviewById(id) {
-  return mockPendingReviews.find((r) => r.id === id) ?? mockPendingReviews[0];
+function decisionMessage(result) {
+  if (result === 'APPROVED') return 'Review approved.';
+  if (result === 'NEEDS_INFO') return 'Requested more information from customer.';
+  if (result === 'REJECTED') return 'Review rejected.';
+  return 'Decision saved.';
 }
 
 export default function ReviewVerificationPage() {
   const { id } = useParams();
   const [note, setNote] = useState('');
   const [status, setStatus] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [review, setReview] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState('');
+  const [previewMimeType, setPreviewMimeType] = useState('');
+  const [previewError, setPreviewError] = useState('');
 
-  const review = getPendingReviewById(id || '1');
+  useEffect(() => {
+    let cancelled = false;
 
-  function handleApprove() {
-    setStatus('Review approved (mock).');
-  }
+    async function loadReview() {
+      setLoading(true);
+      setError('');
+      try {
+        const data = await getMechanicReceipt(id);
+        if (cancelled) return;
+        setReview(data);
+      } catch (err) {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : 'Failed to load receipt details.');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
 
-  function handleRequestInfo() {
-    if (!note.trim()) {
-      setStatus('Please add a note before requesting more info.');
+    if (id) {
+      loadReview();
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let objectUrl = null;
+
+    async function loadPreview() {
+      if (!review?.hasReceipt) {
+        setPreviewUrl('');
+        setPreviewMimeType('');
+        setPreviewError('');
+        return;
+      }
+
+      setPreviewError('');
+      try {
+        const fileData = await getMechanicReceiptFile(id);
+        if (cancelled) return;
+
+        objectUrl = URL.createObjectURL(fileData.blob);
+        setPreviewUrl((prev) => {
+          if (prev) URL.revokeObjectURL(prev);
+          return objectUrl;
+        });
+        setPreviewMimeType(fileData.contentType || 'application/octet-stream');
+      } catch (err) {
+        if (cancelled) return;
+        setPreviewUrl((prev) => {
+          if (prev) URL.revokeObjectURL(prev);
+          return '';
+        });
+        setPreviewMimeType('');
+        setPreviewError(err instanceof Error ? err.message : 'Unable to load receipt preview.');
+      }
+    }
+
+    if (id) {
+      loadPreview();
+    }
+
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [id, review?.hasReceipt]);
+
+  async function handleDecision(result) {
+    const requiresNote = result === 'NEEDS_INFO' || result === 'REJECTED';
+
+    if (requiresNote && !note.trim()) {
+      setStatus(
+        result === 'REJECTED'
+          ? 'Please add a note before rejecting.'
+          : 'Please add a note before requesting more info.',
+      );
       return;
     }
-    setStatus('Requested more information from customer (mock).');
+
+    setSubmitting(true);
+    setError('');
+
+    try {
+      const updated = await decideMechanicReceipt(id, {
+        result,
+        notes: note.trim(),
+      });
+      setReview(updated);
+      setStatus(updated?.message ?? decisionMessage(result));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save decision.');
+    } finally {
+      setSubmitting(false);
+    }
   }
 
-  function handleReject() {
-    if (!note.trim()) {
-      setStatus('Please add a note before rejecting.');
-      return;
-    }
-    setStatus('Review rejected (mock).');
+  if (loading && !review) {
+    return (
+      <section className="mb-4">
+        <h1 className="mb-1">Review Verification</h1>
+        <p className="wt-text-muted mb-0">Loading verification details...</p>
+      </section>
+    );
+  }
+
+  if (!review) {
+    return (
+      <section className="mb-4">
+        <h1 className="mb-1">Review Verification</h1>
+        <p className="wt-text-muted mb-0">{error || 'Review verification details not found.'}</p>
+      </section>
+    );
   }
 
   return (
@@ -67,6 +158,22 @@ export default function ReviewVerificationPage() {
           Verify the authenticity of this customer review.
         </p>
       </section>
+
+      {error && (
+        <div
+          className="mb-3 small d-flex align-items-center gap-2"
+          style={{
+            padding: '0.75rem 1rem',
+            borderRadius: 12,
+            backgroundColor: 'rgba(239,68,68,0.12)',
+            border: '1px solid rgba(239,68,68,0.45)',
+            color: '#f87171',
+          }}
+        >
+          <LuCircleAlert size={18} style={{ flexShrink: 0 }} />
+          {error}
+        </div>
+      )}
 
       {status && (
         <div
@@ -150,18 +257,38 @@ export default function ReviewVerificationPage() {
               {review.hasReceipt ? (
                 <div className="d-flex flex-column gap-3 small">
                   <div
-                    className="rounded-4 d-flex align-items-center justify-content-center"
+                    className="rounded-4 d-flex align-items-center justify-content-center overflow-hidden"
                     style={{
                       backgroundColor: '#2A2740',
                       border: '2px dashed #3A3652',
                       height: '14rem',
                     }}
                   >
-                    <div className="text-center wt-text-muted">
-                      <LuFileText size={40} className="mb-2" />
-                      <div>{review.receiptDetails.fileName ?? 'Receipt file'}</div>
-                      <div className="small">Preview not implemented in mock.</div>
-                    </div>
+                    {previewUrl && previewMimeType.startsWith('image/') && (
+                      <img
+                        src={previewUrl}
+                        alt={review.receiptDetails?.fileName ?? 'Receipt'}
+                        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                      />
+                    )}
+                    {previewUrl && previewMimeType.includes('pdf') && (
+                      <iframe
+                        src={previewUrl}
+                        title="Receipt preview"
+                        style={{ width: '100%', height: '100%', border: 0 }}
+                      />
+                    )}
+                    {(!previewUrl || (!previewMimeType.startsWith('image/') && !previewMimeType.includes('pdf'))) && (
+                      <div className="text-center wt-text-muted">
+                        <LuFileText size={40} className="mb-2" />
+                        <div>{review.receiptDetails?.fileName ?? 'Receipt file'}</div>
+                        {previewError ? (
+                          <div className="small" style={{ color: '#FF8C42' }}>{previewError}</div>
+                        ) : (
+                          <div className="small">Preview unavailable for this file type.</div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   <div
@@ -175,16 +302,29 @@ export default function ReviewVerificationPage() {
                     <div className="d-flex flex-column gap-1 wt-text-muted">
                       <div className="d-flex justify-content-between">
                         <span>Service</span>
-                        <span>{review.receiptDetails.service}</span>
+                        <span>{review.receiptDetails?.service}</span>
                       </div>
                       <div className="d-flex justify-content-between">
                         <span>Amount</span>
-                        <span>{review.receiptDetails.amount}</span>
+                        <span>{review.receiptDetails?.amount}</span>
                       </div>
                       <div className="d-flex justify-content-between">
                         <span>Date</span>
-                        <span>{review.receiptDetails.date}</span>
+                        <span>{review.receiptDetails?.date}</span>
                       </div>
+                      {previewUrl && (
+                        <div className="d-flex justify-content-between">
+                          <span>File</span>
+                          <a
+                            href={previewUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            style={{ color: '#FF8C42' }}
+                          >
+                            Open receipt
+                          </a>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -231,19 +371,21 @@ export default function ReviewVerificationPage() {
                   type="button"
                   className="btn d-flex justify-content-center align-items-center gap-2"
                   style={{ backgroundColor: '#16a34a', color: '#ffffff' }}
-                  onClick={handleApprove}
+                  onClick={() => handleDecision('APPROVED')}
+                  disabled={submitting}
                 >
                   <LuBadgeCheck size={18} />
-                  <span>Approve & Verify</span>
+                  <span>{submitting ? 'Saving...' : 'Approve & Verify'}</span>
                 </button>
                 <button
                   type="button"
                   className="btn d-flex justify-content-center align-items-center gap-2"
                   style={{ backgroundColor: '#FF8C42', color: '#ffffff' }}
-                  onClick={handleRequestInfo}
+                  onClick={() => handleDecision('NEEDS_INFO')}
+                  disabled={submitting}
                 >
                   <LuFileText size={18} />
-                  <span>Request More Info</span>
+                  <span>{submitting ? 'Saving...' : 'Request More Info'}</span>
                 </button>
                 <button
                   type="button"
@@ -253,10 +395,11 @@ export default function ReviewVerificationPage() {
                     border: '1px solid #d32f2f',
                     color: '#ef4444',
                   }}
-                  onClick={handleReject}
+                  onClick={() => handleDecision('REJECTED')}
+                  disabled={submitting}
                 >
                   <LuCircleX size={18} />
-                  <span>Reject</span>
+                  <span>{submitting ? 'Saving...' : 'Reject'}</span>
                 </button>
               </div>
             </div>
@@ -266,4 +409,3 @@ export default function ReviewVerificationPage() {
     </>
   );
 }
-

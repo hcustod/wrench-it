@@ -1,6 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LuPlus, LuPencil, LuTrash2, LuSave } from 'react-icons/lu';
+import {
+  createMyShopService,
+  deleteMyShopService,
+  getMyShopServices,
+  updateMyShopService,
+} from '../api/shop.js';
 
 const CATEGORIES = [
   'Maintenance',
@@ -16,17 +22,6 @@ const CATEGORIES = [
   'Other',
 ];
 
-const INITIAL_SERVICES = [
-  { id: '1', name: 'Oil Change', price: 45, duration: '30 min', category: 'Maintenance' },
-  { id: '2', name: 'Brake Pad Replacement', price: 280, duration: '2 hours', category: 'Brakes' },
-  { id: '3', name: 'Engine Diagnostics', price: 95, duration: '1 hour', category: 'Diagnostics' },
-  { id: '4', name: 'Tire Rotation', price: 35, duration: '45 min', category: 'Tires' },
-  { id: '5', name: 'Battery Replacement', price: 180, duration: '30 min', category: 'Electrical' },
-  { id: '6', name: 'Transmission Service', price: 320, duration: '3 hours', category: 'Transmission' },
-  { id: '7', name: 'AC Recharge', price: 150, duration: '1 hour', category: 'Climate Control' },
-  { id: '8', name: 'Wheel Alignment', price: 85, duration: '1 hour', category: 'Alignment' },
-];
-
 const inputStyle = {
   backgroundColor: '#2A2740',
   border: '1px solid #3A3652',
@@ -36,41 +31,115 @@ const inputStyle = {
   width: '100%',
 };
 
+const EMPTY_NEW_SERVICE = {
+  name: '',
+  price: '',
+  duration: '',
+  category: 'Maintenance',
+};
+
+function normalizeService(service) {
+  return {
+    id: service?.id,
+    name: service?.name ?? '',
+    price: typeof service?.price === 'number' ? service.price : 0,
+    duration: service?.duration ?? '—',
+    category: service?.category ?? 'Other',
+  };
+}
+
+function toUpsertPayload(service) {
+  const parsedPrice = Number(service.price);
+  return {
+    name: service.name.trim(),
+    price: Number.isFinite(parsedPrice) ? parsedPrice : 0,
+    duration: service.duration === '—' ? '' : service.duration,
+    category: service.category,
+  };
+}
+
 export default function ManageServicesPage() {
   const navigate = useNavigate();
-  const [services, setServices] = useState(INITIAL_SERVICES);
+  const [services, setServices] = useState([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [newService, setNewService] = useState({
-    name: '',
-    price: '',
-    duration: '',
-    category: 'Maintenance',
-  });
+  const [newService, setNewService] = useState(EMPTY_NEW_SERVICE);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [busyAdd, setBusyAdd] = useState(false);
+  const [busyDeleteId, setBusyDeleteId] = useState(null);
+  const [busyUpdateId, setBusyUpdateId] = useState(null);
 
-  function handleDelete(id) {
-    if (window.confirm('Are you sure you want to delete this service?')) {
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadServices() {
+      setLoading(true);
+      try {
+        const response = await getMyShopServices();
+        if (cancelled) return;
+        setServices((response ?? []).map(normalizeService));
+        setError('');
+      } catch (err) {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : 'Failed to load services.');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    loadServices();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function handleDelete(id) {
+    if (!window.confirm('Are you sure you want to delete this service?')) {
+      return;
+    }
+
+    setBusyDeleteId(id);
+    setError('');
+
+    try {
+      await deleteMyShopService(id);
       setServices((prev) => prev.filter((s) => s.id !== id));
       if (editingId === id) setEditingId(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete service.');
+    } finally {
+      setBusyDeleteId(null);
     }
   }
 
-  function handleAddService(e) {
+  async function handleAddService(e) {
     e.preventDefault();
-    const service = {
-      id: String(Date.now()),
-      name: newService.name.trim(),
-      price: Number(newService.price) || 0,
-      duration: newService.duration.trim() || '—',
-      category: newService.category,
-    };
-    setServices((prev) => [...prev, service]);
-    setNewService({ name: '', price: '', duration: '', category: 'Maintenance' });
-    setShowAddModal(false);
+
+    if (!newService.name.trim()) {
+      setError('Service name is required.');
+      return;
+    }
+
+    setBusyAdd(true);
+    setError('');
+
+    try {
+      const created = await createMyShopService(toUpsertPayload(newService));
+      setServices((prev) => [...prev, normalizeService(created)]);
+      setNewService(EMPTY_NEW_SERVICE);
+      setShowAddModal(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to add service.');
+    } finally {
+      setBusyAdd(false);
+    }
   }
 
   function handleStartEdit(service) {
     setEditingId(service.id);
+    setError('');
   }
 
   function handleUpdateService(id, field, value) {
@@ -79,8 +148,29 @@ export default function ManageServicesPage() {
     );
   }
 
-  function handleSaveChanges() {
-    setEditingId(null);
+  async function handleSaveChanges(id) {
+    const current = services.find((s) => s.id === id);
+    if (!current) return;
+
+    if (!current.name.trim()) {
+      setError('Service name is required.');
+      return;
+    }
+
+    setBusyUpdateId(id);
+    setError('');
+
+    try {
+      const updated = await updateMyShopService(id, toUpsertPayload(current));
+      setServices((prev) =>
+        prev.map((s) => (s.id === id ? normalizeService(updated) : s))
+      );
+      setEditingId(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update service.');
+    } finally {
+      setBusyUpdateId(null);
+    }
   }
 
   function handleSave() {
@@ -99,12 +189,19 @@ export default function ManageServicesPage() {
             type="button"
             className="btn btn-wt-primary d-inline-flex align-items-center gap-2"
             onClick={() => setShowAddModal(true)}
+            disabled={loading}
           >
             <LuPlus size={18} />
             Add New Service
           </button>
         </div>
       </section>
+
+      {error && (
+        <p className="small mb-3" style={{ color: '#FF8C42' }}>
+          {error}
+        </p>
+      )}
 
       <div className="wt-card p-0 mb-4 overflow-hidden">
         <div
@@ -113,7 +210,9 @@ export default function ManageServicesPage() {
         >
           <div>
             <h2 className="h6 text-white mb-1">Your Services</h2>
-            <p className="wt-text-muted small mb-0">{services.length} active services</p>
+            <p className="wt-text-muted small mb-0">
+              {loading ? 'Loading...' : `${services.length} active services`}
+            </p>
           </div>
         </div>
         <div className="table-responsive">
@@ -214,9 +313,10 @@ export default function ManageServicesPage() {
                         <button
                           type="button"
                           className="btn btn-sm btn-wt-primary"
-                          onClick={() => handleSaveChanges()}
+                          onClick={() => handleSaveChanges(service.id)}
+                          disabled={busyUpdateId === service.id}
                         >
-                          Done
+                          {busyUpdateId === service.id ? 'Saving...' : 'Done'}
                         </button>
                       ) : (
                         <button
@@ -233,6 +333,7 @@ export default function ManageServicesPage() {
                         className="btn btn-sm btn-wt-outline p-2 text-danger"
                         onClick={() => handleDelete(service.id)}
                         title="Delete"
+                        disabled={busyDeleteId === service.id}
                       >
                         <LuTrash2 size={16} />
                       </button>
@@ -240,6 +341,13 @@ export default function ManageServicesPage() {
                   </td>
                 </tr>
               ))}
+              {!loading && services.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-3 px-md-4 py-3 wt-text-muted small">
+                    No services yet. Add your first service.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -252,7 +360,7 @@ export default function ManageServicesPage() {
           onClick={handleSave}
         >
           <LuSave size={18} />
-          Save Changes
+          Back to Dashboard
         </button>
         <button
           type="button"
@@ -332,13 +440,14 @@ export default function ManageServicesPage() {
                 </select>
               </div>
               <div className="d-flex gap-2 pt-2">
-                <button type="submit" className="btn btn-wt-primary flex-grow-1">
-                  Add Service
+                <button type="submit" className="btn btn-wt-primary flex-grow-1" disabled={busyAdd}>
+                  {busyAdd ? 'Adding...' : 'Add Service'}
                 </button>
                 <button
                   type="button"
                   className="btn btn-wt-outline"
                   onClick={() => setShowAddModal(false)}
+                  disabled={busyAdd}
                 >
                   Cancel
                 </button>

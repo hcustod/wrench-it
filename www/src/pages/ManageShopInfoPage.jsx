@@ -1,8 +1,19 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LuMapPin, LuPhone, LuClock, LuSave } from 'react-icons/lu';
+import { getMyShopProfile, updateMyShopProfile } from '../api/shop.js';
 
-const INITIAL_HOURS = {
+const DAY_ORDER = [
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+  'Sunday',
+];
+
+const DEFAULT_HOURS = {
   Monday: { open: '8:00 AM', close: '6:00 PM' },
   Tuesday: { open: '8:00 AM', close: '6:00 PM' },
   Wednesday: { open: '8:00 AM', close: '6:00 PM' },
@@ -12,13 +23,12 @@ const INITIAL_HOURS = {
   Sunday: { open: 'Closed', close: '' },
 };
 
-const INITIAL_FORM = {
-  shopName: 'Premium Auto Care',
-  description:
-    'Family-owned shop with over 20 years of experience. Specializing in European and domestic vehicles.',
-  address: '123 Main St, Los Angeles, CA 90012',
-  phone: '(323) 555-0123',
-  hours: { ...INITIAL_HOURS },
+const EMPTY_FORM = {
+  shopName: '',
+  description: '',
+  address: '',
+  phone: '',
+  hours: {},
 };
 
 const inputStyle = {
@@ -31,14 +41,93 @@ const inputStyle = {
 };
 const focusBorder = { outline: 'none', borderColor: '#FF8C42' };
 
+function buildHours(source) {
+  const out = {};
+
+  DAY_ORDER.forEach((day) => {
+    const sourceWindow = source?.[day] ?? {};
+    out[day] = {
+      open:
+        typeof sourceWindow.open === 'string' && sourceWindow.open.trim()
+          ? sourceWindow.open
+          : DEFAULT_HOURS[day].open,
+      close:
+        typeof sourceWindow.close === 'string' ? sourceWindow.close : DEFAULT_HOURS[day].close,
+    };
+  });
+
+  return out;
+}
+
+function normalizeFormFromApi(data) {
+  return {
+    shopName: data?.shopName ?? '',
+    description: data?.description ?? '',
+    address: data?.address ?? '',
+    phone: data?.phone ?? '',
+    hours: buildHours(data?.hours),
+  };
+}
+
+function cloneHours(hours = {}) {
+  const out = {};
+  Object.entries(hours).forEach(([day, window]) => {
+    out[day] = {
+      open: window?.open ?? '',
+      close: window?.close ?? '',
+    };
+  });
+  return out;
+}
+
+function cloneForm(form) {
+  return {
+    ...form,
+    hours: cloneHours(form.hours),
+  };
+}
+
 export default function ManageShopInfoPage() {
   const navigate = useNavigate();
-  const [form, setForm] = useState(() => ({ ...INITIAL_FORM, hours: { ...INITIAL_HOURS } }));
+  const [form, setForm] = useState(() => ({ ...EMPTY_FORM, hours: buildHours() }));
+  const [initialForm, setInitialForm] = useState(() => ({ ...EMPTY_FORM, hours: buildHours() }));
   const [saveMessage, setSaveMessage] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadProfile() {
+      setLoading(true);
+      try {
+        const data = await getMyShopProfile();
+        if (cancelled) return;
+
+        const normalized = normalizeFormFromApi(data);
+        setForm(cloneForm(normalized));
+        setInitialForm(cloneForm(normalized));
+        setError('');
+      } catch (err) {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : 'Failed to load shop profile.');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    loadProfile();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function handleChange(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
     setSaveMessage('');
+    setError('');
   }
 
   function handleHoursChange(day, field, value) {
@@ -50,6 +139,7 @@ export default function ManageShopInfoPage() {
       },
     }));
     setSaveMessage('');
+    setError('');
   }
 
   function toggleDayClosed(day) {
@@ -59,23 +149,43 @@ export default function ManageShopInfoPage() {
       ...prev,
       hours: {
         ...prev.hours,
-        [day]: isClosed ? { open: '9:00 AM', close: '5:00 PM' } : { open: 'Closed', close: '' },
+        [day]: isClosed ? { ...DEFAULT_HOURS[day] } : { open: 'Closed', close: '' },
       },
     }));
     setSaveMessage('');
+    setError('');
   }
 
-  function handleSave(e) {
+  async function handleSave(e) {
     e.preventDefault();
-    setSaveMessage('Saved (mock).');
+    setSaving(true);
+    setSaveMessage('');
+    setError('');
+
+    try {
+      const updated = await updateMyShopProfile({
+        shopName: form.shopName,
+        description: form.description,
+        address: form.address,
+        phone: form.phone,
+        hours: form.hours,
+      });
+
+      const normalized = normalizeFormFromApi(updated);
+      setForm(cloneForm(normalized));
+      setInitialForm(cloneForm(normalized));
+      setSaveMessage('Changes saved.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save changes.');
+    } finally {
+      setSaving(false);
+    }
   }
 
   function handleCancel() {
-    setForm({
-      ...INITIAL_FORM,
-      hours: { ...INITIAL_HOURS },
-    });
+    setForm(cloneForm(initialForm));
     setSaveMessage('');
+    setError('');
   }
 
   return (
@@ -84,6 +194,25 @@ export default function ManageShopInfoPage() {
         <h1 className="mb-1">Manage Shop Information</h1>
         <p className="wt-text-muted mb-0">Update your shop&apos;s public profile.</p>
       </section>
+
+      {loading && (
+        <p className="small mb-3 wt-text-muted">Loading shop profile...</p>
+      )}
+
+      {error && (
+        <div
+          className="mb-3 small d-flex align-items-center gap-2"
+          style={{
+            padding: '0.75rem 1rem',
+            borderRadius: 12,
+            backgroundColor: 'rgba(239,68,68,0.12)',
+            border: '1px solid rgba(239,68,68,0.5)',
+            color: '#f87171',
+          }}
+        >
+          {error}
+        </div>
+      )}
 
       {saveMessage && (
         <div
@@ -241,14 +370,19 @@ export default function ManageShopInfoPage() {
 
         {/* Actions */}
         <div className="d-flex flex-wrap gap-3">
-          <button type="submit" className="btn btn-wt-primary d-inline-flex align-items-center gap-2">
+          <button
+            type="submit"
+            className="btn btn-wt-primary d-inline-flex align-items-center gap-2"
+            disabled={saving}
+          >
             <LuSave size={18} />
-            Save Changes
+            {saving ? 'Saving...' : 'Save Changes'}
           </button>
           <button
             type="button"
             className="btn btn-wt-outline"
             onClick={handleCancel}
+            disabled={saving || loading}
           >
             Cancel
           </button>

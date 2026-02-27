@@ -16,6 +16,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.wrenchit.api.dto.ReviewRequest;
 import com.wrenchit.api.dto.ReviewResponse;
+import com.wrenchit.api.service.PortalDataService;
 import com.wrenchit.api.service.UserService;
 import com.wrenchit.engagement.entity.StoreReview;
 import com.wrenchit.engagement.service.ReviewService;
@@ -30,11 +31,16 @@ public class ReviewController {
     private final ReviewService reviewService;
     private final StoreService storeService;
     private final UserService userService;
+    private final PortalDataService portalDataService;
 
-    public ReviewController(ReviewService reviewService, StoreService storeService, UserService userService) {
+    public ReviewController(ReviewService reviewService,
+                            StoreService storeService,
+                            UserService userService,
+                            PortalDataService portalDataService) {
         this.reviewService = reviewService;
         this.storeService = storeService;
         this.userService = userService;
+        this.portalDataService = portalDataService;
     }
 
     @GetMapping
@@ -49,7 +55,15 @@ public class ReviewController {
                                  @Validated @RequestBody ReviewRequest request) {
         assertStoreExists(storeId);
         var user = userService.getOrCreateFromJwt(jwt);
-        StoreReview review = reviewService.upsertReview(storeId, user.getId(), request.rating, request.comment);
+        portalDataService.validateReviewReferences(storeId, user.getId(), request.serviceId, request.receiptId);
+        StoreReview review = reviewService.upsertReview(
+                storeId,
+                user.getId(),
+                request.serviceId,
+                request.receiptId,
+                request.rating,
+                request.comment
+        );
         return toResponse(review);
     }
 
@@ -64,6 +78,8 @@ public class ReviewController {
         res.id = review.getId();
         res.storeId = review.getStoreId();
         res.userId = review.getUserId();
+        res.serviceId = review.getServiceId();
+        res.receiptId = review.getReceiptId();
         res.rating = review.getRating();
         res.comment = review.getComment();
         res.createdAt = review.getCreatedAt();

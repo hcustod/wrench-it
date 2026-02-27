@@ -40,7 +40,15 @@ public class GooglePlacesClient implements PlacesClient {
                 .retrieve()
                 .body(GooglePlacesSearchResponse.class);
 
-        if (response == null || response.results == null) {
+        if (response == null) {
+            return List.of();
+        }
+        if (response.status != null
+                && !response.status.equalsIgnoreCase("OK")
+                && !response.status.equalsIgnoreCase("ZERO_RESULTS")) {
+            throw new IllegalStateException("Google Places search failed with status: " + response.status);
+        }
+        if (response.results == null || response.results.isEmpty()) {
             return List.of();
         }
 
@@ -85,7 +93,13 @@ public class GooglePlacesClient implements PlacesClient {
                 .retrieve()
                 .body(GooglePlacesDetailsResponse.class);
 
-        if (response == null || response.result == null) {
+        if (response == null) {
+            return null;
+        }
+        if (response.status != null && !response.status.equalsIgnoreCase("OK")) {
+            throw new IllegalStateException("Google Places details failed with status: " + response.status);
+        }
+        if (response.result == null) {
             return null;
         }
 
@@ -106,6 +120,8 @@ public class GooglePlacesClient implements PlacesClient {
     }
 
     static class GooglePlacesSearchResponse {
+        public String status;
+        public String error_message;
         public List<SearchResultItem> results;
     }
 
@@ -119,6 +135,8 @@ public class GooglePlacesClient implements PlacesClient {
     }
 
     static class GooglePlacesDetailsResponse {
+        public String status;
+        public String error_message;
         public DetailsResultItem result;
     }
 

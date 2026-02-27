@@ -12,7 +12,9 @@ import { apiFetch } from './client.js';
  *  lng?: number,
  *  radiusKm?: number,
  *  minRating?: number,
- *  services?: string
+ *  services?: string,
+ *  city?: string,
+ *  state?: string
  * }} [params]
  * @returns {Promise<{ items: Array, limit: number, offset: number, total: number }>}
  */
@@ -30,6 +32,8 @@ export function searchStores(params = {}) {
     search.set('minRating', String(params.minRating));
   }
   if (params.services) search.set('services', params.services);
+  if (params.city) search.set('city', params.city);
+  if (params.state) search.set('state', params.state);
 
   const qs = search.toString();
   return apiFetch(`/stores/search${qs ? `?${qs}` : ''}`);
@@ -45,6 +49,15 @@ export function getStore(id) {
 }
 
 /**
+ * GET /api/stores/{storeId}/services
+ * @param {string} storeId
+ * @returns {Promise<Array>}
+ */
+export function listStoreServices(storeId) {
+  return apiFetch(`/stores/${storeId}/services`);
+}
+
+/**
  * GET /api/stores/compare
  * @param {string[]} ids - Store UUIDs
  * @param {{ sort?: string, direction?: string }} [options]
@@ -57,4 +70,23 @@ export function compareStores(ids, options = {}) {
   if (options.direction) search.set('direction', options.direction);
   const qs = search.toString();
   return apiFetch(`/stores/compare${qs ? `?${qs}` : ''}`);
+}
+
+/**
+ * GET /api/stores/services
+ * @returns {Promise<Array<{name: string}>>}
+ */
+export function listCompareServices() {
+  return apiFetch('/stores/services');
+}
+
+/**
+ * GET /api/stores/compare-by-service?service=...
+ * @param {string} service
+ * @returns {Promise<{ service: string, stores: Array }>}
+ */
+export function compareStoresByService(service) {
+  const search = new URLSearchParams();
+  search.set('service', service);
+  return apiFetch(`/stores/compare-by-service?${search.toString()}`);
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   LuUsers,
   LuStore,
@@ -7,51 +7,66 @@ import {
   LuShield,
   LuTrendingUp,
 } from 'react-icons/lu';
-import {
-  mockAdminUsers,
-  mockFlaggedReviews,
-  mockPendingShops,
-} from '../data/mockData.js';
 import StatsCard from '../components/dashboard/StatsCard.jsx';
+import { decidePendingShop, getAdminDashboard } from '../api/admin.js';
 
-function getAdminUsers() {
-  return mockAdminUsers;
-}
-
-function getFlaggedReviews() {
-  return mockFlaggedReviews;
-}
-
-function getPendingShops() {
-  return mockPendingShops;
-}
-
-function getAdminStats() {
-  return {
-    totalUsers: 12547,
-    totalShops: 1834,
-    totalReviews: 45623,
-    issues: 12,
-  };
-}
+const EMPTY_STATS = {
+  totalUsers: 0,
+  totalShops: 0,
+  totalReviews: 0,
+  issues: 0,
+};
 
 export default function AdminDashboardPage() {
-  const users = getAdminUsers();
-  const flaggedReviews = getFlaggedReviews();
-  const [pendingShops, setPendingShops] = useState(() => getPendingShops());
-  const stats = getAdminStats();
+  const [stats, setStats] = useState(EMPTY_STATS);
+  const [users, setUsers] = useState([]);
+  const [flaggedReviews, setFlaggedReviews] = useState([]);
+  const [pendingShops, setPendingShops] = useState([]);
+  const [error, setError] = useState('');
 
-  function handleUpdateShopStatus(id, status) {
-    setPendingShops((current) =>
-      current.map((shop) =>
-        shop.id === id
-          ? {
-              ...shop,
-              status,
-            }
-          : shop,
-      ),
-    );
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadDashboard() {
+      try {
+        const data = await getAdminDashboard();
+        if (cancelled) return;
+
+        setStats(data?.stats ?? EMPTY_STATS);
+        setUsers(data?.users ?? []);
+        setFlaggedReviews(data?.flaggedReviews ?? []);
+        setPendingShops(data?.pendingShops ?? []);
+        setError('');
+      } catch (err) {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : 'Failed to load admin dashboard.');
+      }
+    }
+
+    loadDashboard();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function handleUpdateShopStatus(id, status) {
+    const result = status === 'Approved' ? 'APPROVED' : 'REJECTED';
+    try {
+      await decidePendingShop(id, { result });
+      setPendingShops((current) =>
+        current.map((shop) =>
+          shop.id === id
+            ? {
+                ...shop,
+                status,
+              }
+            : shop,
+        ),
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save decision.');
+    }
   }
 
   return (
@@ -75,6 +90,11 @@ export default function AdminDashboardPage() {
         <p className="wt-text-muted mb-0">
           Platform overview and moderation tools in one place.
         </p>
+        {error && (
+          <p className="small mt-2 mb-0" style={{ color: '#FF8C42' }}>
+            {error}
+          </p>
+        )}
       </section>
 
       {/* Stats grid */}
@@ -84,34 +104,34 @@ export default function AdminDashboardPage() {
             <StatsCard
               icon={LuUsers}
               label="Total users"
-              value={stats.totalUsers.toLocaleString()}
+              value={(stats.totalUsers ?? 0).toLocaleString()}
               tone="soft"
-              helper="+12.5% this month"
+              helper="From live data"
             />
           </div>
           <div className="col-12 col-sm-6 col-lg-3">
             <StatsCard
               icon={LuStore}
               label="Total shops"
-              value={stats.totalShops.toLocaleString()}
+              value={(stats.totalShops ?? 0).toLocaleString()}
               tone="accent"
-              helper="+8.3% this month"
+              helper="From live data"
             />
           </div>
           <div className="col-12 col-sm-6 col-lg-3">
             <StatsCard
               icon={LuMessageSquare}
               label="Total reviews"
-              value={stats.totalReviews.toLocaleString()}
+              value={(stats.totalReviews ?? 0).toLocaleString()}
               tone="success"
-              helper="+15.7% this month"
+              helper="From live data"
             />
           </div>
           <div className="col-12 col-sm-6 col-lg-3">
             <StatsCard
               icon={LuTriangleAlert}
               label="Issues"
-              value={stats.issues}
+              value={stats.issues ?? 0}
               tone="danger"
               helper="Requires attention"
             />
@@ -165,6 +185,9 @@ export default function AdminDashboardPage() {
                     </div>
                   </div>
                 ))}
+                {users.length === 0 && (
+                  <p className="wt-text-muted small mb-0">No recent users.</p>
+                )}
               </div>
             </div>
           </div>
@@ -217,6 +240,9 @@ export default function AdminDashboardPage() {
                     </div>
                   </div>
                 ))}
+                {flaggedReviews.length === 0 && (
+                  <p className="wt-text-muted small mb-0">No flagged reviews.</p>
+                )}
               </div>
             </div>
           </div>
@@ -295,21 +321,21 @@ export default function AdminDashboardPage() {
                             shop.status === 'Approved'
                               ? 'rgba(22,163,74,0.18)'
                               : shop.status === 'Rejected'
-                              ? 'rgba(248,113,113,0.18)'
-                              : 'rgba(255,140,66,0.18)',
+                                ? 'rgba(248,113,113,0.18)'
+                                : 'rgba(255,140,66,0.18)',
                           color:
                             shop.status === 'Approved'
                               ? '#22c55e'
                               : shop.status === 'Rejected'
-                              ? '#f87171'
-                              : '#FF8C42',
+                                ? '#f87171'
+                                : '#FF8C42',
                           borderRadius: 999,
                           border:
                             shop.status === 'Approved'
                               ? '1px solid rgba(22,163,74,0.6)'
                               : shop.status === 'Rejected'
-                              ? '1px solid rgba(248,113,113,0.6)'
-                              : '1px solid rgba(255,140,66,0.6)',
+                                ? '1px solid rgba(248,113,113,0.6)'
+                                : '1px solid rgba(255,140,66,0.6)',
                         }}
                       >
                         {shop.status}
@@ -339,6 +365,13 @@ export default function AdminDashboardPage() {
                     </td>
                   </tr>
                 ))}
+                {pendingShops.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="py-3 px-2 px-md-3 small wt-text-muted">
+                      No pending verifications.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -354,20 +387,20 @@ export default function AdminDashboardPage() {
               <div className="small wt-text-muted mb-1">User growth</div>
               <div className="text-white d-flex align-items-center gap-1">
                 <LuTrendingUp size={14} />
-                <span>+12.5% MoM</span>
+                <span>Live metrics</span>
               </div>
             </div>
             <div className="col-6 col-md-3">
               <div className="small wt-text-muted mb-1">Review accuracy</div>
-              <div className="text-white">96.8%</div>
+              <div className="text-white">Data-driven</div>
             </div>
             <div className="col-6 col-md-3">
               <div className="small wt-text-muted mb-1">Active mechanics</div>
-              <div className="text-white">342</div>
+              <div className="text-white">From validations</div>
             </div>
             <div className="col-6 col-md-3">
               <div className="small wt-text-muted mb-1">Avg response time</div>
-              <div className="text-white">8.4 hours</div>
+              <div className="text-white">Live updates</div>
             </div>
           </div>
         </div>
@@ -375,4 +408,3 @@ export default function AdminDashboardPage() {
     </>
   );
 }
-

@@ -10,7 +10,6 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -101,31 +100,22 @@ public class StoreService {
                 total = storeRepository.countWithinRadius(lat, lng, radiusKm, minRating, servicesContains, city, state, hasWebsite, hasPhone);
             } else {
                 Sort sortSpec = toSort(criteria.getSort(), criteria.getDirection(), hasRadius);
-                int startPage = Math.max(offset / limit, 0);
-                int inPageOffset = Math.max(offset % limit, 0);
-
-                Page<Store> firstPage = storeRepository.findAll(PageRequest.of(startPage, limit, sortSpec));
-                total = firstPage.getTotalElements();
-
-                if (inPageOffset == 0) {
-                    stores = firstPage.getContent();
-                } else {
-                    stores = new ArrayList<>();
-                    List<Store> firstContent = firstPage.getContent();
-                    if (inPageOffset < firstContent.size()) {
-                        stores.addAll(firstContent.subList(inPageOffset, firstContent.size()));
-                    }
-                    if (stores.size() < limit) {
-                        Page<Store> nextPage = storeRepository.findAll(PageRequest.of(startPage + 1, limit, sortSpec));
-                        List<Store> nextContent = nextPage.getContent();
-                        int remaining = limit - stores.size();
-                        stores.addAll(nextContent.subList(0, Math.min(remaining, nextContent.size())));
-                    }
-                }
+                Page<Store> page = storeRepository.searchAllFiltered(
+                        minRating,
+                        servicesContains,
+                        city,
+                        state,
+                        hasWebsite,
+                        hasPhone,
+                        OffsetLimitPageable.of(limit, offset, sortSpec)
+                );
+                stores = page.getContent();
+                total = page.getTotalElements();
             }
         } else if (!hasRadius && googlePlacesProperties.isEnabled() && hasGoogleApiKeyConfigured()) {
             try {
-                List<PlaceSearchResult> places = placesClient.search(query, limit, openNow);
+                int requestedLimit = Math.min(Math.max(limit + offset, limit), 100);
+                List<PlaceSearchResult> places = placesClient.search(query, requestedLimit, openNow);
                 List<String> placeIds = new ArrayList<>();
                 for (PlaceSearchResult place : places) {
                     placeIds.add(place.getPlaceId());
@@ -139,6 +129,7 @@ public class StoreService {
                     stores = filterLocalAttributes(stores, minRating, servicesContains, city, state, hasWebsite, hasPhone);
                 }
                 total = stores.size();
+                stores = paginate(stores, offset, limit);
             } catch (RuntimeException ex) {
                 log.warn("Google Places search failed; falling back to local search. query='{}'", query, ex);
                 stores = storeRepository.searchLocal(query, DEFAULT_SIMILARITY, minRating, servicesContains, city, state, hasWebsite, hasPhone, limit, offset);
@@ -272,5 +263,20 @@ public class StoreService {
             filtered.add(store);
         }
         return filtered;
+    }
+
+    private List<Store> paginate(List<Store> stores, int offset, int limit) {
+        if (stores == null || stores.isEmpty()) {
+            return List.of();
+        }
+
+        int safeOffset = Math.max(offset, 0);
+        int safeLimit = Math.max(limit, 1);
+        if (safeOffset >= stores.size()) {
+            return List.of();
+        }
+
+        int end = Math.min(safeOffset + safeLimit, stores.size());
+        return new ArrayList<>(stores.subList(safeOffset, end));
     }
 }

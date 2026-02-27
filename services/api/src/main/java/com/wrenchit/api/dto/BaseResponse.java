@@ -8,4 +8,9 @@ public class BaseResponse {
     public String email;
     public String displayName;
     public String role;
+    public String phone;
+    public String certificationNumber;
+    public Integer yearsExperience;
+    public String shopName;
+    public String businessLicense;
 }

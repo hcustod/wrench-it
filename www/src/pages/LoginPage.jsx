@@ -1,16 +1,27 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { LuMail, LuLock, LuLogIn } from 'react-icons/lu';
+import { beginLogin } from '../auth/keycloak.js';
 
 export default function LoginPage() {
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState('client');
   const [message, setMessage] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
-    setMessage(`Demo only – would route to ${role} dashboard here.`);
+    setMessage('');
+    setLoading(true);
+    try {
+      const result = await beginLogin({ email, password });
+      navigate(result.returnTo ?? '/dashboard', { replace: true });
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'Unable to sign in.');
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -31,7 +42,7 @@ export default function LoginPage() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="d-flex flex-column gap-3">
+          <form onSubmit={handleSubmit} noValidate className="d-flex flex-column gap-3">
             <div>
               <label className="form-label text-white small mb-1">Email Address</label>
               <div className="input-group">
@@ -40,7 +51,6 @@ export default function LoginPage() {
                 </span>
                 <input
                   type="email"
-                  required
                   className="form-control wt-input border-0"
                   placeholder="you@example.com"
                   value={email}
@@ -57,27 +67,12 @@ export default function LoginPage() {
                 </span>
                 <input
                   type="password"
-                  required
                   className="form-control wt-input border-0"
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />
               </div>
-            </div>
-
-            <div>
-              <label className="form-label text-white small mb-1">Login As</label>
-              <select
-                className="form-select wt-input"
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-              >
-                <option value="client">Client</option>
-                <option value="mechanic">Mechanic</option>
-                <option value="shop-owner">Shop Owner</option>
-                <option value="admin">Admin</option>
-              </select>
             </div>
 
             <div className="d-flex justify-content-between align-items-center small">
@@ -102,10 +97,11 @@ export default function LoginPage() {
 
             <button
               type="submit"
+              disabled={loading}
               className="btn btn-wt-primary d-flex justify-content-center align-items-center gap-2"
             >
               <LuLogIn size={18} />
-              <span>Login</span>
+              <span>{loading ? 'Signing in...' : 'Login'}</span>
             </button>
           </form>
 
@@ -131,4 +127,3 @@ export default function LoginPage() {
     </div>
   );
 }
-

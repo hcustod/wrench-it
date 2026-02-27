@@ -24,6 +24,21 @@ public class User {
     @Column(nullable = false, length = 30)
     private String role = "CUSTOMER";
 
+    @Column(length = 40)
+    private String phone;
+
+    @Column(name = "certification_number", length = 80)
+    private String certificationNumber;
+
+    @Column(name = "years_experience")
+    private Integer yearsExperience;
+
+    @Column(name = "shop_name", length = 160)
+    private String shopName;
+
+    @Column(name = "business_license", length = 120)
+    private String businessLicense;
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
@@ -76,6 +91,46 @@ public class User {
 
     public void setRole(String role) {
         this.role = role;
+    }
+
+    public String getPhone() {
+        return phone;
+    }
+
+    public void setPhone(String phone) {
+        this.phone = phone;
+    }
+
+    public String getCertificationNumber() {
+        return certificationNumber;
+    }
+
+    public void setCertificationNumber(String certificationNumber) {
+        this.certificationNumber = certificationNumber;
+    }
+
+    public Integer getYearsExperience() {
+        return yearsExperience;
+    }
+
+    public void setYearsExperience(Integer yearsExperience) {
+        this.yearsExperience = yearsExperience;
+    }
+
+    public String getShopName() {
+        return shopName;
+    }
+
+    public void setShopName(String shopName) {
+        this.shopName = shopName;
+    }
+
+    public String getBusinessLicense() {
+        return businessLicense;
+    }
+
+    public void setBusinessLicense(String businessLicense) {
+        this.businessLicense = businessLicense;
     }
 
     public OffsetDateTime getCreatedAt() {

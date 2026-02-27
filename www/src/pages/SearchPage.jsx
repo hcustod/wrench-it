@@ -53,6 +53,26 @@ function normalizeStore(store) {
   };
 }
 
+function parseLocationFilters(locationText) {
+  const normalized = (locationText ?? '').trim();
+  if (!normalized) return { city: null, state: null };
+
+  const parts = normalized.split(',').map((part) => part.trim()).filter(Boolean);
+  if (parts.length >= 2) {
+    return {
+      city: parts[0],
+      state: parts[1],
+    };
+  }
+
+  const token = parts[0];
+  if (!token) return { city: null, state: null };
+  if (/^[A-Za-z]{2,3}$/.test(token)) {
+    return { city: null, state: token.toUpperCase() };
+  }
+  return { city: token, state: null };
+}
+
 function resolveMapsApiKey() {
   const fromRuntime = window.WRENCHIT_CONFIG?.googleMapsApiKey;
   if (fromRuntime && fromRuntime.trim()) return fromRuntime.trim();
@@ -171,16 +191,26 @@ export default function SearchPage() {
       setError('');
       try {
         const qService = searchParams.get('service') ?? '';
+        const qLocation = (searchParams.get('location') ?? '').trim();
         const servicesParam = selectedCategory === 'all'
           ? undefined
           : selectedCategory.replaceAll('-', ' ');
+        const shouldUseLocationText = !userCoords
+          && qLocation
+          && qLocation.toLowerCase() !== 'current location';
+        const { city: cityParam, state: stateParam } = parseLocationFilters(qLocation);
+        const qParam = qService.trim() || (shouldUseLocationText && !cityParam && !stateParam
+          ? qLocation
+          : '');
 
         const response = await searchStores({
-          q: qService.trim(),
+          q: qParam,
           limit: 25,
           offset: 0,
           minRating,
           services: servicesParam,
+          ...(shouldUseLocationText && cityParam ? { city: cityParam } : {}),
+          ...(shouldUseLocationText && stateParam ? { state: stateParam } : {}),
           ...(userCoords ? {
             lat: userCoords.lat,
             lng: userCoords.lng,

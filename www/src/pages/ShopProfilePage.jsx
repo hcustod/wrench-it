@@ -1,10 +1,68 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { LuStar, LuMapPin, LuPhone, LuClock, LuArrowRight } from 'react-icons/lu';
-import { mockShops, mockServices, mockReviews } from '../data/mockData.js';
-import { getStore } from '../api/stores.js';
+import { getStore, listStoreServices } from '../api/stores.js';
 import { listReviews } from '../api/reviews.js';
 import ReviewCard from '../components/review/ReviewCard.jsx';
+
+function formatDate(value) {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+function normalizeStore(store) {
+  return {
+    ...store,
+    rating: typeof store?.rating === 'number' ? store.rating : 0,
+    reviewCount: typeof store?.ratingCount === 'number' ? store.ratingCount : 0,
+    location:
+      store?.city && store?.state
+        ? `${store.city}, ${store.state}`
+        : store?.address ?? 'Location unavailable',
+  };
+}
+
+function formatHoursWindow(hours) {
+  if (!hours || typeof hours !== 'object') return null;
+  const open = typeof hours.open === 'string' ? hours.open : '';
+  const close = typeof hours.close === 'string' ? hours.close : '';
+  if (!open && !close) return null;
+  if (open === 'Closed') return 'Closed';
+  return close ? `${open} - ${close}` : open;
+}
+
+function resolveMapsApiKey() {
+  const fromRuntime = window.WRENCHIT_CONFIG?.googleMapsApiKey;
+  if (fromRuntime && fromRuntime.trim()) return fromRuntime.trim();
+  const fromVite = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+  if (fromVite && fromVite.trim()) return fromVite.trim();
+  return '';
+}
+
+async function loadGoogleMaps(apiKey) {
+  if (window.google?.maps) return;
+  if (!apiKey) throw new Error('Google Maps API key is missing.');
+
+  if (!window.__wrenchitGoogleMapsLoader) {
+    window.__wrenchitGoogleMapsLoader = new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}`;
+      script.async = true;
+      script.defer = true;
+      script.onload = resolve;
+      script.onerror = () => reject(new Error('Failed to load Google Maps script.'));
+      document.head.appendChild(script);
+    });
+  }
+
+  await window.__wrenchitGoogleMapsLoader;
+}
 
 export default function ShopProfilePage() {
   const { id } = useParams();
@@ -15,6 +73,11 @@ export default function ShopProfilePage() {
   const [mechanicReviews, setMechanicReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [mapStatus, setMapStatus] = useState('');
+  const mapHostRef = useRef(null);
+  const mapRef = useRef(null);
+  const mapMarkerRef = useRef(null);
+  const mapsApiKey = useMemo(() => resolveMapsApiKey(), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -23,44 +86,34 @@ export default function ShopProfilePage() {
       setLoading(true);
       setError('');
       try {
-        const [storeRes, reviewsRes] = await Promise.all([
+        const [storeRes, servicesRes, reviewsRes] = await Promise.all([
           getStore(id),
+          listStoreServices(id),
           listReviews(id),
         ]);
         if (cancelled) return;
 
-        setShop(storeRes);
-
-        // services are not yet exposed via API; fall back to mock mapping if possible
-        const byId = mockServices.filter((svc) => svc.shopId === id);
-        const fallbackServices =
-          byId.length > 0
-            ? byId
-            : mockServices.filter((svc) => svc.shopId === 'shop-1');
-        setServices(fallbackServices);
+        setShop(normalizeStore(storeRes));
+        setServices(servicesRes ?? []);
 
         const apiReviews = (reviewsRes ?? []).map((rev) => ({
           id: rev.id,
           reviewerName: 'Customer',
-          rating: rev.rating,
+          rating: Number(rev.rating ?? 0),
           reviewText: rev.comment,
           isVerified: true,
           isMechanicReview: false,
-          date: rev.createdAt,
+          date: formatDate(rev.createdAt),
         }));
         setCustomerReviews(apiReviews);
         setMechanicReviews([]);
       } catch (err) {
         if (cancelled) return;
         setError(err instanceof Error ? err.message : 'Failed to load shop details.');
-
-        // fallback to mock data to avoid a broken page
-        const mockShop = mockShops.find((s) => s.id === id) ?? mockShops[0];
-        setShop(mockShop);
-        setServices(mockServices.filter((svc) => svc.shopId === mockShop.id));
-        const mock = mockReviews.filter((rev) => rev.shopId === mockShop.id);
-        setCustomerReviews(mock.filter((r) => !r.isMechanicReview));
-        setMechanicReviews(mock.filter((r) => r.isMechanicReview));
+        setShop(null);
+        setServices([]);
+        setCustomerReviews([]);
+        setMechanicReviews([]);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -74,6 +127,76 @@ export default function ShopProfilePage() {
       cancelled = true;
     };
   }, [id]);
+
+  const hoursRows = useMemo(() => {
+    if (!shop?.hours || typeof shop.hours !== 'object') {
+      return [];
+    }
+
+    return Object.entries(shop.hours)
+      .map(([day, value]) => ({
+        day,
+        value:
+          typeof value === 'string'
+            ? value
+            : formatHoursWindow(value),
+      }))
+      .filter((item) => item.value);
+  }, [shop]);
+
+  useEffect(() => {
+    let disposed = false;
+
+    async function initMap() {
+      if (activeTab !== 'overview' || !mapHostRef.current) return;
+      if (shop?.lat == null || shop?.lng == null) {
+        setMapStatus('Shop location coordinates are unavailable.');
+        return;
+      }
+      if (!mapsApiKey) {
+        setMapStatus('Google Maps key is missing. Add it to www/public/config.js and rebuild the www container.');
+        return;
+      }
+
+      setMapStatus('Loading map...');
+      try {
+        await loadGoogleMaps(mapsApiKey);
+        if (disposed) return;
+
+        const center = { lat: Number(shop.lat), lng: Number(shop.lng) };
+        if (!mapRef.current || mapRef.current.getDiv?.() !== mapHostRef.current) {
+          mapRef.current = new window.google.maps.Map(mapHostRef.current, {
+            center,
+            zoom: 14,
+            mapTypeControl: false,
+            streetViewControl: false,
+            fullscreenControl: true,
+          });
+        } else {
+          mapRef.current.setCenter(center);
+        }
+
+        if (mapMarkerRef.current) {
+          mapMarkerRef.current.setMap(null);
+        }
+        mapMarkerRef.current = new window.google.maps.Marker({
+          map: mapRef.current,
+          position: center,
+          title: shop.name || 'Shop',
+        });
+        setMapStatus('');
+      } catch {
+        if (!disposed) {
+          setMapStatus('Could not load Google Maps API. Check key, billing, and localhost referrer restrictions.');
+        }
+      }
+    }
+
+    initMap();
+    return () => {
+      disposed = true;
+    };
+  }, [activeTab, shop?.lat, shop?.lng, shop?.name, mapsApiKey]);
 
   if (loading && !shop) {
     return (
@@ -92,6 +215,7 @@ export default function ShopProfilePage() {
   }
 
   const fullStars = Math.floor(shop.rating ?? 0);
+  const hasCoordinates = shop?.lat != null && shop?.lng != null;
 
   return (
     <>
@@ -117,7 +241,7 @@ export default function ShopProfilePage() {
                       />
                     ))}
                   </div>
-                  <span className="text-white">{shop.rating.toFixed(1)}</span>
+                  <span className="text-white">{Number(shop.rating ?? 0).toFixed(1)}</span>
                 </div>
                 <span className="wt-text-muted small">({shop.reviewCount} reviews)</span>
               </div>
@@ -133,7 +257,9 @@ export default function ShopProfilePage() {
                 </div>
                 <div className="d-flex align-items-center gap-2">
                   <LuClock size={18} />
-                  <span>Hours information coming soon</span>
+                  <span>
+                    {hoursRows.length > 0 ? 'See hours below' : 'Hours information unavailable'}
+                  </span>
                 </div>
               </div>
             </div>
@@ -202,7 +328,7 @@ export default function ShopProfilePage() {
                   <h3 className="h5 text-white mb-3">About This Shop</h3>
                   <p className="wt-text-muted mb-0">
                     {shop.description ??
-                      'Local independent repair shop providing diagnostics, maintenance, and repairs with transparent communication and fair pricing.'}
+                      'Shop profile details are sourced from live store data.'}
                   </p>
                 </div>
 
@@ -213,32 +339,72 @@ export default function ShopProfilePage() {
                     className="rounded-4 p-3 p-md-4"
                     style={{ backgroundColor: '#2A2740', border: '1px solid #3A3652' }}
                   >
-                    {Object.entries(shop.hours ?? {}).map(([day, hours], idx, arr) => (
+                    {hoursRows.map((item, idx) => (
                       <div
-                        key={day}
+                        key={item.day}
                         className="d-flex justify-content-between py-1 small"
                         style={{
                           borderBottom:
-                            idx !== arr.length - 1 ? '1px solid #3A3652' : 'none',
+                            idx !== hoursRows.length - 1 ? '1px solid #3A3652' : 'none',
                         }}
                       >
-                        <span className="text-white">{day}</span>
-                        <span className="wt-text-muted">{hours}</span>
+                        <span className="text-white">{item.day}</span>
+                        <span className="wt-text-muted">{item.value}</span>
                       </div>
                     ))}
+                    {hoursRows.length === 0 && (
+                      <p className="wt-text-muted small mb-0">Hours not available.</p>
+                    )}
                   </div>
                 </div>
 
-                {/* Location map placeholder */}
+                {/* Location map */}
                 <div>
                   <h3 className="h5 text-white mb-3">Location</h3>
-                  <div
-                    className="rounded-4 d-flex align-items-center justify-content-center"
-                    style={{ backgroundColor: '#2A2740', border: '1px solid #3A3652', height: '16rem' }}
-                  >
-                    <div className="text-center">
-                      <LuMapPin className="wt-text-muted mb-2" size={40} />
-                      <p className="wt-text-muted mb-0">Map showing shop location</p>
+                  <div style={{ position: 'relative' }}>
+                    <div
+                      ref={mapHostRef}
+                      className="rounded-4"
+                      style={{ backgroundColor: '#2A2740', border: '1px solid #3A3652', height: '16rem' }}
+                    />
+                    {mapStatus && (
+                      <div
+                        className="rounded-4 d-flex align-items-center justify-content-center"
+                        style={{
+                          position: 'absolute',
+                          inset: 0,
+                          backgroundColor: 'rgba(42, 39, 64, 0.92)',
+                        }}
+                      >
+                        <p className="wt-text-muted mb-0 px-3 text-center">{mapStatus}</p>
+                      </div>
+                    )}
+                    {!mapStatus && !hasCoordinates && (
+                      <div
+                        className="rounded-4 d-flex align-items-center justify-content-center"
+                        style={{
+                          position: 'absolute',
+                          inset: 0,
+                          backgroundColor: 'rgba(42, 39, 64, 0.92)',
+                        }}
+                      >
+                        <div className="text-center">
+                          <LuMapPin className="wt-text-muted mb-2" size={40} />
+                          <p className="wt-text-muted mb-0">Map showing shop location</p>
+                        </div>
+                      </div>
+                    )}
+                    {hasCoordinates ? (
+                      <div className="small wt-text-muted mt-2">
+                        {Number(shop.lat).toFixed(6)}, {Number(shop.lng).toFixed(6)}
+                      </div>
+                    ) : (
+                      <div className="small wt-text-muted mt-2">
+                        Coordinates unavailable for this shop.
+                      </div>
+                    )}
+                    <div className="small wt-text-muted mt-1">
+                      {shop.address ?? shop.location}
                     </div>
                   </div>
                 </div>
@@ -289,7 +455,9 @@ export default function ShopProfilePage() {
                           }}
                         >
                           <td className="px-4 py-3 text-white">{svc.name}</td>
-                          <td className="px-4 py-3 text-white">${svc.price}</td>
+                          <td className="px-4 py-3 text-white">
+                            {typeof svc.price === 'number' ? `$${svc.price}` : 'Call'}
+                          </td>
                           <td className="px-4 py-3 wt-text-muted">
                             {svc.duration}
                           </td>
@@ -318,6 +486,13 @@ export default function ShopProfilePage() {
                           </td>
                         </tr>
                       ))}
+                      {services.length === 0 && (
+                        <tr>
+                          <td colSpan={5} className="px-4 py-3 wt-text-muted small">
+                            No services listed for this shop.
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -340,6 +515,9 @@ export default function ShopProfilePage() {
                     {customerReviews.map((rev) => (
                       <ReviewCard key={rev.id} {...rev} />
                     ))}
+                    {customerReviews.length === 0 && (
+                      <p className="wt-text-muted small mb-0">No reviews yet.</p>
+                    )}
                   </div>
                 </div>
 
@@ -349,6 +527,9 @@ export default function ShopProfilePage() {
                     {mechanicReviews.map((rev) => (
                       <ReviewCard key={rev.id} {...rev} />
                     ))}
+                    {mechanicReviews.length === 0 && (
+                      <p className="wt-text-muted small mb-0">No mechanic reviews yet.</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -359,4 +540,3 @@ export default function ShopProfilePage() {
     </>
   );
 }
-

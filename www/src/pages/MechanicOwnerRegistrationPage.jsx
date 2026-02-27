@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { LuUser, LuMail, LuLock, LuPhone } from 'react-icons/lu';
+import { beginRegistration } from '../auth/keycloak.js';
 
 export default function MechanicOwnerRegistrationPage() {
+  const navigate = useNavigate();
   const [role, setRole] = useState('shop-owner');
   const [form, setForm] = useState({
     fullName: '',
@@ -17,6 +19,7 @@ export default function MechanicOwnerRegistrationPage() {
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [loading, setLoading] = useState(false);
 
   function handleChange(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -24,15 +27,37 @@ export default function MechanicOwnerRegistrationPage() {
     setSuccess('');
   }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
+    setError('');
+    setSuccess('');
+
     if (form.password !== form.confirmPassword) {
       setError('Passwords do not match.');
-      setSuccess('');
       return;
     }
-    setSuccess('Demo only – professional account creation is not wired yet.');
-    setError('');
+
+    const returnTo = role === 'mechanic' ? '/mechanic-dashboard' : '/shop-dashboard';
+    setLoading(true);
+    try {
+      const result = await beginRegistration({
+        fullName: form.fullName,
+        email: form.email,
+        password: form.password,
+        role: role === 'mechanic' ? 'MECHANIC' : 'SHOP_OWNER',
+        phone: form.phone,
+        certificationNumber: form.certificationNumber,
+        yearsExperience: form.yearsExperience === '' ? null : Number(form.yearsExperience),
+        shopName: form.shopName,
+        businessLicense: form.businessLicense,
+        returnTo,
+      });
+      navigate(result.returnTo ?? returnTo, { replace: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to register.');
+    } finally {
+      setLoading(false);
+    }
   }
 
   const isMechanic = role === 'mechanic';
@@ -118,7 +143,7 @@ export default function MechanicOwnerRegistrationPage() {
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="d-flex flex-column gap-3">
+          <form onSubmit={handleSubmit} noValidate className="d-flex flex-column gap-3">
             {/* Common fields */}
             <div>
               <label className="form-label text-white small mb-1">Full Name *</label>
@@ -128,7 +153,6 @@ export default function MechanicOwnerRegistrationPage() {
                 </span>
                 <input
                   type="text"
-                  required
                   className="form-control wt-input border-0"
                   placeholder="Name"
                   value={form.fullName}
@@ -145,7 +169,6 @@ export default function MechanicOwnerRegistrationPage() {
                 </span>
                 <input
                   type="email"
-                  required
                   className="form-control wt-input border-0"
                   placeholder="you@shop.com"
                   value={form.email}
@@ -162,11 +185,11 @@ export default function MechanicOwnerRegistrationPage() {
                 </span>
                 <input
                   type="tel"
-                  required
                   className="form-control wt-input border-0"
                   placeholder="(555) 555-1234"
                   value={form.phone}
                   onChange={(e) => handleChange('phone', e.target.value)}
+                  required
                 />
               </div>
             </div>
@@ -180,7 +203,6 @@ export default function MechanicOwnerRegistrationPage() {
                   </span>
                   <input
                     type="password"
-                    required
                     className="form-control wt-input border-0"
                     placeholder="••••••••"
                     value={form.password}
@@ -196,7 +218,6 @@ export default function MechanicOwnerRegistrationPage() {
                   </span>
                   <input
                     type="password"
-                    required
                     className="form-control wt-input border-0"
                     placeholder="••••••••"
                     value={form.confirmPassword}
@@ -243,13 +264,14 @@ export default function MechanicOwnerRegistrationPage() {
             ) : (
               <div className="row g-2">
                 <div className="col-12 col-md-6">
-                  <label className="form-label text-white small mb-1">Shop Name</label>
+                  <label className="form-label text-white small mb-1">Shop Name *</label>
                   <input
                     type="text"
                     className="form-control wt-input"
                     placeholder="Downtown Auto Care"
                     value={form.shopName}
                     onChange={(e) => handleChange('shopName', e.target.value)}
+                    required={!isMechanic}
                   />
                 </div>
                 <div className="col-12 col-md-6">
@@ -289,9 +311,10 @@ export default function MechanicOwnerRegistrationPage() {
 
             <button
               type="submit"
+              disabled={loading}
               className="btn btn-wt-primary w-100"
             >
-              Create Professional Account
+              {loading ? 'Creating Account...' : 'Create Professional Account'}
             </button>
           </form>
 
@@ -311,4 +334,3 @@ export default function MechanicOwnerRegistrationPage() {
     </div>
   );
 }
-

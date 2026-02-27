@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { LuUser, LuMail, LuLock, LuUserPlus } from 'react-icons/lu';
+import { beginRegistration } from '../auth/keycloak.js';
 
 export default function UserRegistrationPage() {
+  const navigate = useNavigate();
   const [form, setForm] = useState({
     fullName: '',
     email: '',
@@ -11,6 +13,7 @@ export default function UserRegistrationPage() {
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [loading, setLoading] = useState(false);
 
   function handleChange(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -18,15 +21,31 @@ export default function UserRegistrationPage() {
     setSuccess('');
   }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
+    setError('');
+    setSuccess('');
+
     if (form.password !== form.confirmPassword) {
       setError('Passwords do not match.');
-      setSuccess('');
       return;
     }
-    setSuccess('Demo only – account creation is not wired yet.');
-    setError('');
+
+    setLoading(true);
+    try {
+      const result = await beginRegistration({
+        fullName: form.fullName,
+        email: form.email,
+        password: form.password,
+        role: 'CUSTOMER',
+        returnTo: '/dashboard',
+      });
+      navigate(result.returnTo ?? '/dashboard', { replace: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to register.');
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -52,7 +71,7 @@ export default function UserRegistrationPage() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="d-flex flex-column gap-3">
+          <form onSubmit={handleSubmit} noValidate className="d-flex flex-column gap-3">
             <div>
               <label className="form-label text-white small mb-1">Full Name *</label>
               <div className="input-group">
@@ -61,7 +80,6 @@ export default function UserRegistrationPage() {
                 </span>
                 <input
                   type="text"
-                  required
                   className="form-control wt-input border-0"
                   placeholder="John Smith"
                   value={form.fullName}
@@ -78,7 +96,6 @@ export default function UserRegistrationPage() {
                 </span>
                 <input
                   type="email"
-                  required
                   className="form-control wt-input border-0"
                   placeholder="you@example.com"
                   value={form.email}
@@ -95,7 +112,6 @@ export default function UserRegistrationPage() {
                 </span>
                 <input
                   type="password"
-                  required
                   className="form-control wt-input border-0"
                   placeholder="••••••••"
                   value={form.password}
@@ -112,7 +128,6 @@ export default function UserRegistrationPage() {
                 </span>
                 <input
                   type="password"
-                  required
                   className="form-control wt-input border-0"
                   placeholder="••••••••"
                   value={form.confirmPassword}
@@ -147,10 +162,11 @@ export default function UserRegistrationPage() {
 
             <button
               type="submit"
+              disabled={loading}
               className="btn btn-wt-primary d-flex justify-content-center align-items-center gap-2"
             >
               <LuUserPlus size={18} />
-              <span>Create Account</span>
+              <span>{loading ? 'Creating Account...' : 'Create Account'}</span>
             </button>
           </form>
 
@@ -183,4 +199,3 @@ export default function UserRegistrationPage() {
     </div>
   );
 }
-

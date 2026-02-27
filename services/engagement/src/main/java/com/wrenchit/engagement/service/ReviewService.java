@@ -41,11 +41,18 @@ public class ReviewService {
     }
 
     @Transactional
-    public StoreReview upsertReview(UUID storeId, UUID userId, int rating, String comment) {
+    public StoreReview upsertReview(UUID storeId,
+                                    UUID userId,
+                                    UUID serviceId,
+                                    UUID receiptId,
+                                    int rating,
+                                    String comment) {
         StoreReview review = storeReviewRepository.findByStoreIdAndUserId(storeId, userId)
                 .orElseGet(StoreReview::new);
         review.setStoreId(storeId);
         review.setUserId(userId);
+        review.setServiceId(serviceId);
+        review.setReceiptId(receiptId);
         review.setRating(rating);
         review.setComment(comment);
         return storeReviewRepository.save(review);

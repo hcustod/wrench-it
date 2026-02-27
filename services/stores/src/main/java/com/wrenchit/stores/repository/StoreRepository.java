@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -192,6 +193,35 @@ public interface StoreRepository extends JpaRepository<Store, UUID> {
                                 @Param("state") String state,
                                 @Param("hasWebsite") Boolean hasWebsite,
                                 @Param("hasPhone") Boolean hasPhone);
+
+    @Query("""
+            select s
+            from Store s
+            where (:minRating is null or s.rating >= :minRating)
+              and (
+                :servicesContains is null
+                or lower(coalesce(s.servicesText, '')) like concat('%', lower(cast(:servicesContains as string)), '%')
+              )
+              and (:city is null or lower(s.city) = lower(cast(:city as string)))
+              and (:state is null or lower(s.state) = lower(cast(:state as string)))
+              and (
+                :hasWebsite is null
+                or (:hasWebsite = true and s.website is not null and s.website <> '')
+                or (:hasWebsite = false and (s.website is null or s.website = ''))
+              )
+              and (
+                :hasPhone is null
+                or (:hasPhone = true and s.phone is not null and s.phone <> '')
+                or (:hasPhone = false and (s.phone is null or s.phone = ''))
+              )
+            """)
+    Page<Store> searchAllFiltered(@Param("minRating") Double minRating,
+                                  @Param("servicesContains") String servicesContains,
+                                  @Param("city") String city,
+                                  @Param("state") String state,
+                                  @Param("hasWebsite") Boolean hasWebsite,
+                                  @Param("hasPhone") Boolean hasPhone,
+                                  Pageable pageable);
 
     List<Store> findAllByOrderByRatingCountDesc(Pageable pageable);
 }

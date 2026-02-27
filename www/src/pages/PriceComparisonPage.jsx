@@ -1,54 +1,106 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { LuStar, LuMapPin, LuBadgeCheck, LuArrowRight } from 'react-icons/lu';
-import { mockShops, mockServices } from '../data/mockData.js';
+import { compareStoresByService, listCompareServices } from '../api/stores.js';
 
-function getComparisonRows(selectedServiceId) {
-  const selectedSvc = mockServices.find((s) => s.id === selectedServiceId) ?? mockServices[0];
-  if (!selectedSvc) return [];
-
-  // Services with the same name represent the comparable service across shops
-  const relatedServices = mockServices.filter((s) => s.name === selectedSvc.name);
-
-  const rows = relatedServices
-    .map((svc, idx) => {
-      const shop = mockShops.find((s) => s.id === svc.shopId);
-      if (!shop) return null;
-
-      // Simple mock distance and verification for now
-      const distanceMiles = 1 + idx * 2;
-      const hasVerifiedMechanic = (shop.rating ?? 0) >= 4.8;
-
-      return {
-        id: shop.id,
-        name: shop.name,
-        location: shop.location,
-        rating: shop.rating,
-        reviewCount: shop.reviewCount,
-        price: svc.price,
-        distanceLabel: `${distanceMiles.toFixed(1)} mi`,
-        hasVerifiedMechanic,
-      };
-    })
-    .filter(Boolean);
-
-  // Sort by price ascending
-  rows.sort((a, b) => a.price - b.price);
-
-  return rows;
+function formatPrice(price) {
+  if (typeof price !== 'number' || Number.isNaN(price)) {
+    return 'Call';
+  }
+  if (Number.isInteger(price)) {
+    return `$${price}`;
+  }
+  return `$${price.toFixed(2)}`;
 }
 
 export default function PriceComparisonPage() {
-  const [selectedServiceId, setSelectedServiceId] = useState(
-    mockServices[0]?.id ?? '',
-  );
+  const [serviceOptions, setServiceOptions] = useState([]);
+  const [selectedService, setSelectedService] = useState('');
+  const [comparisonRows, setComparisonRows] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const comparisonRows = useMemo(
-    () => getComparisonRows(selectedServiceId),
-    [selectedServiceId],
-  );
+  useEffect(() => {
+    let cancelled = false;
 
-  const selectedService = mockServices.find((s) => s.id === selectedServiceId) ?? mockServices[0];
+    async function loadServices() {
+      try {
+        const response = await listCompareServices();
+        if (cancelled) return;
+
+        const names = (response ?? [])
+          .map((item) => (typeof item?.name === 'string' ? item.name.trim() : ''))
+          .filter(Boolean);
+
+        setServiceOptions(names);
+        if (names.length > 0) {
+          setSelectedService(names[0]);
+        }
+      } catch (err) {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : 'Failed to load services.');
+      }
+    }
+
+    loadServices();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedService) {
+      setComparisonRows([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadComparison() {
+      setLoading(true);
+      setError('');
+      try {
+        const response = await compareStoresByService(selectedService);
+        if (cancelled) return;
+
+        const rows = (response?.stores ?? []).map((store) => ({
+          id: store.id,
+          name: store.name,
+          location: store.location,
+          rating: typeof store.rating === 'number' ? store.rating : 0,
+          reviewCount: typeof store.reviewCount === 'number' ? store.reviewCount : 0,
+          price: typeof store.price === 'number' ? store.price : null,
+          distanceLabel: '—',
+          hasVerifiedMechanic: Boolean(store.hasVerifiedMechanic),
+        }));
+
+        setComparisonRows(rows);
+      } catch (err) {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : 'Failed to load comparison.');
+        setComparisonRows([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    loadComparison();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedService]);
+
+  const sortedRows = useMemo(() => {
+    const rows = [...comparisonRows];
+    rows.sort((a, b) => {
+      const ap = a.price == null ? Number.POSITIVE_INFINITY : a.price;
+      const bp = b.price == null ? Number.POSITIVE_INFINITY : b.price;
+      return ap - bp;
+    });
+    return rows;
+  }, [comparisonRows]);
 
   return (
     <>
@@ -67,17 +119,27 @@ export default function PriceComparisonPage() {
         <div className="wt-card">
           <label className="d-block text-white mb-2 small">Select Service</label>
           <select
-            value={selectedServiceId}
-            onChange={(e) => setSelectedServiceId(e.target.value)}
+            value={selectedService}
+            onChange={(e) => setSelectedService(e.target.value)}
             className="form-select wt-input"
             style={{ maxWidth: '18rem' }}
+            disabled={serviceOptions.length === 0}
           >
-            {mockServices.map((service) => (
-              <option key={service.id} value={service.id}>
-                {service.name}
-              </option>
-            ))}
+            {serviceOptions.length === 0 ? (
+              <option value="">No services available</option>
+            ) : (
+              serviceOptions.map((service) => (
+                <option key={service} value={service}>
+                  {service}
+                </option>
+              ))
+            )}
           </select>
+          {error && (
+            <p className="small mt-2 mb-0" style={{ color: '#FF8C42' }}>
+              {error}
+            </p>
+          )}
         </div>
       </section>
 
@@ -89,11 +151,15 @@ export default function PriceComparisonPage() {
             style={{ backgroundColor: '#2A2740', borderBottom: '2px solid rgba(255,140,66,0.3)' }}
           >
             <h2 className="h5 text-white mb-1">
-              Price Comparison for: {selectedService?.name}
+              Price Comparison for: {selectedService || '—'}
             </h2>
             <p className="wt-text-muted mb-0 small">
-              Showing {comparisonRows.length} shop
-              {comparisonRows.length === 1 ? '' : 's'} with this service
+              {loading ? 'Loading...' : (
+                <>
+                  Showing {sortedRows.length} shop
+                  {sortedRows.length === 1 ? '' : 's'} with this service
+                </>
+              )}
             </p>
           </div>
 
@@ -115,13 +181,13 @@ export default function PriceComparisonPage() {
                 </tr>
               </thead>
               <tbody style={{ backgroundColor: '#242133' }}>
-                {comparisonRows.map((row, idx) => (
+                {sortedRows.map((row, idx) => (
                   <tr
                     key={row.id}
                     className="small"
                     style={{
                       borderBottom:
-                        idx !== comparisonRows.length - 1 ? '1px solid #3A3652' : 'none',
+                        idx !== sortedRows.length - 1 ? '1px solid #3A3652' : 'none',
                       backgroundColor: idx === 0 ? '#2A2740' : 'transparent',
                       borderLeft: idx === 0 ? '4px solid #FF8C42' : '4px solid transparent',
                     }}
@@ -151,7 +217,7 @@ export default function PriceComparisonPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3 align-middle">
-                      <span className="text-white fw-semibold">${row.price}</span>
+                      <span className="text-white fw-semibold">{formatPrice(row.price)}</span>
                     </td>
                     <td className="px-4 py-3 align-middle">
                       <div className="d-flex align-items-center gap-2">
@@ -188,6 +254,13 @@ export default function PriceComparisonPage() {
                     </td>
                   </tr>
                 ))}
+                {!loading && sortedRows.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-4 wt-text-muted small">
+                      No comparison data found for this service.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -215,4 +288,3 @@ export default function PriceComparisonPage() {
     </>
   );
 }
-

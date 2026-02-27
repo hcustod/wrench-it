@@ -1,32 +1,82 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { LuStar, LuClock, LuCalendar, LuHeart } from 'react-icons/lu';
-import {
-  mockUserReviews,
-  mockBookings,
-  mockSavedShops,
-} from '../data/mockData.js';
 import StatusBadge from '../components/common/StatusBadge.jsx';
 import { listSavedShops } from '../api/saved.js';
+import { getMyDashboard } from '../api/user.js';
 
-function getMyReviews() {
-  return mockUserReviews;
+function formatDate(value) {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
 }
 
-function getMyBookings() {
-  return mockBookings;
+function formatTime(value) {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleTimeString(undefined, {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
 }
 
 export default function UserDashboardPage() {
   const [activeTab, setActiveTab] = useState('reviews');
 
-  const reviews = getMyReviews();
-  const bookings = getMyBookings();
-  const [savedShops, setSavedShops] = useState(mockSavedShops);
+  const [reviews, setReviews] = useState([]);
+  const [bookings, setBookings] = useState([]);
+  const [savedShops, setSavedShops] = useState([]);
+
+  const [dashboardError, setDashboardError] = useState('');
   const [savedError, setSavedError] = useState('');
 
   useEffect(() => {
     let cancelled = false;
+
+    async function loadDashboard() {
+      try {
+        const response = await getMyDashboard();
+        if (cancelled) return;
+
+        const reviewItems = (response?.reviews ?? []).map((item) => ({
+          id: item.id,
+          storeId: item.storeId,
+          shopName: item.shopName,
+          service: item.service,
+          date: formatDate(item.date),
+          status: item.status === 'verified' ? 'verified' : 'pending',
+          rating: Number(item.rating ?? 0),
+          reviewText: item.reviewText ?? '',
+        }));
+
+        const bookingItems = (response?.bookings ?? []).map((item) => ({
+          id: item.id,
+          storeId: item.storeId,
+          shopName: item.shopName,
+          service: item.service,
+          date: formatDate(item.date),
+          time: formatTime(item.time || item.date),
+          status: item.status === 'upcoming' ? 'upcoming' : 'completed',
+        }));
+
+        setReviews(reviewItems);
+        setBookings(bookingItems);
+        setDashboardError('');
+      } catch (err) {
+        if (cancelled) return;
+        setReviews([]);
+        setBookings([]);
+        setDashboardError(
+          err instanceof Error ? err.message : 'Failed to load your dashboard data.',
+        );
+      }
+    }
 
     async function loadSaved() {
       try {
@@ -47,22 +97,18 @@ export default function UserDashboardPage() {
                   : store.address,
             };
           });
-        if (items.length > 0) {
-          setSavedShops(items);
-        } else {
-          setSavedShops([]);
-        }
+        setSavedShops(items);
         setSavedError('');
       } catch (err) {
         if (cancelled) return;
-        // fall back to mock data but surface that real API failed
-        setSavedShops(mockSavedShops);
+        setSavedShops([]);
         setSavedError(
           err instanceof Error ? err.message : 'Failed to load saved shops.',
         );
       }
     }
 
+    loadDashboard();
     loadSaved();
 
     return () => {
@@ -70,8 +116,14 @@ export default function UserDashboardPage() {
     };
   }, []);
 
-  const upcomingBookings = bookings.filter((b) => b.status === 'upcoming');
-  const pastBookings = bookings.filter((b) => b.status === 'completed');
+  const upcomingBookings = useMemo(
+    () => bookings.filter((b) => b.status === 'upcoming'),
+    [bookings],
+  );
+  const pastBookings = useMemo(
+    () => bookings.filter((b) => b.status === 'completed'),
+    [bookings],
+  );
 
   return (
     <>
@@ -117,6 +169,11 @@ export default function UserDashboardPage() {
           <div className="p-4 p-md-5">
             {activeTab === 'reviews' && (
               <div className="d-flex flex-column gap-3">
+                {dashboardError && (
+                  <p className="small" style={{ color: '#FF8C42' }}>
+                    {dashboardError}
+                  </p>
+                )}
                 <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-2 gap-2">
                   <h3 className="h5 text-white mb-0">
                     Your Reviews ({reviews.length})
@@ -167,11 +224,21 @@ export default function UserDashboardPage() {
                     <p className="wt-text-muted mb-0">{rev.reviewText}</p>
                   </div>
                 ))}
+                {reviews.length === 0 && (
+                  <p className="wt-text-muted small mb-0">
+                    You haven&apos;t submitted any reviews yet.
+                  </p>
+                )}
               </div>
             )}
 
             {activeTab === 'bookings' && (
               <div className="d-flex flex-column gap-4">
+                {dashboardError && (
+                  <p className="small" style={{ color: '#FF8C42' }}>
+                    {dashboardError}
+                  </p>
+                )}
                 <h3 className="h5 text-white mb-1">Your Bookings</h3>
 
                 {/* Upcoming */}
@@ -250,7 +317,7 @@ export default function UserDashboardPage() {
                             </div>
                           </div>
                           <Link
-                            to="/write-review"
+                            to={b.storeId ? `/write-review?storeId=${b.storeId}` : '/write-review'}
                             className="btn btn-sm btn-wt-primary"
                           >
                             Write Review
@@ -331,4 +398,3 @@ export default function UserDashboardPage() {
     </>
   );
 }
-

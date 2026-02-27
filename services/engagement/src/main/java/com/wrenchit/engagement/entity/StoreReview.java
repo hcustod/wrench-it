@@ -21,6 +21,12 @@ public class StoreReview {
     @Column(name = "user_id", nullable = false)
     private UUID userId;
 
+    @Column(name = "service_id")
+    private UUID serviceId;
+
+    @Column(name = "receipt_id")
+    private UUID receiptId;
+
     @Column(nullable = false)
     private int rating;
 
@@ -53,6 +59,22 @@ public class StoreReview {
 
     public void setUserId(UUID userId) {
         this.userId = userId;
+    }
+
+    public UUID getServiceId() {
+        return serviceId;
+    }
+
+    public void setServiceId(UUID serviceId) {
+        this.serviceId = serviceId;
+    }
+
+    public UUID getReceiptId() {
+        return receiptId;
+    }
+
+    public void setReceiptId(UUID receiptId) {
+        this.receiptId = receiptId;
     }
 
     public int getRating() {

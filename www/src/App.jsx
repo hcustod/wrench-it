@@ -17,6 +17,7 @@ import ManageShopInfoPage from './pages/ManageShopInfoPage.jsx';
 import ManageServicesPage from './pages/ManageServicesPage.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
 import Layout from './components/layout/Layout.jsx';
+import ProtectedRoute from './auth/ProtectedRoute.jsx';
 
 export default function App() {
   return (
@@ -81,33 +82,41 @@ export default function App() {
         <Route
           path="/dashboard"
           element={
-            <Layout>
-              <UserDashboardPage />
-            </Layout>
+            <ProtectedRoute>
+              <Layout>
+                <UserDashboardPage />
+              </Layout>
+            </ProtectedRoute>
           }
         />
         <Route
           path="/mechanic-dashboard"
           element={
-            <Layout>
-              <MechanicDashboardPage />
-            </Layout>
+            <ProtectedRoute roles={['MECHANIC']}>
+              <Layout>
+                <MechanicDashboardPage />
+              </Layout>
+            </ProtectedRoute>
           }
         />
         <Route
           path="/shop-dashboard"
           element={
-            <Layout>
-              <ShopOwnerDashboardPage />
-            </Layout>
+            <ProtectedRoute roles={['SHOP_OWNER']}>
+              <Layout>
+                <ShopOwnerDashboardPage />
+              </Layout>
+            </ProtectedRoute>
           }
         />
         <Route
           path="/admin"
           element={
-            <Layout>
-              <AdminDashboardPage />
-            </Layout>
+            <ProtectedRoute roles={['ADMIN']}>
+              <Layout>
+                <AdminDashboardPage />
+              </Layout>
+            </ProtectedRoute>
           }
         />
         <Route
@@ -121,33 +130,41 @@ export default function App() {
         <Route
           path="/write-review"
           element={
-            <Layout>
-              <WriteReviewPage />
-            </Layout>
+            <ProtectedRoute>
+              <Layout>
+                <WriteReviewPage />
+              </Layout>
+            </ProtectedRoute>
           }
         />
         <Route
           path="/verify-review/:id"
           element={
-            <Layout>
-              <ReviewVerificationPage />
-            </Layout>
+            <ProtectedRoute roles={['MECHANIC']}>
+              <Layout>
+                <ReviewVerificationPage />
+              </Layout>
+            </ProtectedRoute>
           }
         />
         <Route
           path="/manage-shop"
           element={
-            <Layout>
-              <ManageShopInfoPage />
-            </Layout>
+            <ProtectedRoute roles={['SHOP_OWNER']}>
+              <Layout>
+                <ManageShopInfoPage />
+              </Layout>
+            </ProtectedRoute>
           }
         />
         <Route
           path="/manage-services"
           element={
-            <Layout>
-              <ManageServicesPage />
-            </Layout>
+            <ProtectedRoute roles={['SHOP_OWNER']}>
+              <Layout>
+                <ManageServicesPage />
+              </Layout>
+            </ProtectedRoute>
           }
         />
         <Route

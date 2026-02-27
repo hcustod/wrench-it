@@ -1,5 +1,7 @@
 package com.wrenchit.api.dto;
 
+import java.util.UUID;
+
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
@@ -13,4 +15,8 @@ public class ReviewRequest {
 
     @Size(max = 2000)
     public String comment;
+
+    public UUID serviceId;
+
+    public UUID receiptId;
 }

@@ -27,6 +27,11 @@ public class BaseController {
         res.email = user.getEmail();
         res.displayName = user.getDisplayName();
         res.role = user.getRole();
+        res.phone = user.getPhone();
+        res.certificationNumber = user.getCertificationNumber();
+        res.yearsExperience = user.getYearsExperience();
+        res.shopName = user.getShopName();
+        res.businessLicense = user.getBusinessLicense();
         return res;
     }
 }
