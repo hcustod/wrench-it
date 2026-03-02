@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   LuUsers,
   LuStore,
@@ -147,12 +148,12 @@ export default function AdminDashboardPage() {
             <div className="wt-card h-100 d-flex flex-column">
               <div className="d-flex justify-content-between align-items-center mb-3">
                 <h2 className="h5 text-white mb-0">Recent users</h2>
-                <button
-                  type="button"
+                <Link
+                  to="/admin/users"
                   className="btn btn-sm btn-wt-outline"
                 >
                   Manage users
-                </button>
+                </Link>
               </div>
 
               <div className="d-flex flex-column gap-3">
@@ -231,12 +232,12 @@ export default function AdminDashboardPage() {
                     </div>
                     <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
                       <p className="text-danger small mb-0">⚠ {review.reason}</p>
-                      <button
-                        type="button"
+                      <Link
+                        to={`/admin/review/${review.id}`}
                         className="btn btn-sm btn-wt-outline"
                       >
                         Open review
-                      </button>
+                      </Link>
                     </div>
                   </div>
                 ))}

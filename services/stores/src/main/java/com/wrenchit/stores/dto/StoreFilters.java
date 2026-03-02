@@ -5,6 +5,7 @@ public class StoreFilters {
     private String servicesContains;
     private String city;
     private String state;
+    private String priceRange;
     private Boolean hasWebsite;
     private Boolean hasPhone;
     private Boolean openNow;
@@ -13,6 +14,7 @@ public class StoreFilters {
                         String servicesContains,
                         String city,
                         String state,
+                        String priceRange,
                         Boolean hasWebsite,
                         Boolean hasPhone,
                         Boolean openNow) {
@@ -20,6 +22,7 @@ public class StoreFilters {
         this.servicesContains = servicesContains;
         this.city = city;
         this.state = state;
+        this.priceRange = priceRange;
         this.hasWebsite = hasWebsite;
         this.hasPhone = hasPhone;
         this.openNow = openNow;
@@ -39,6 +42,10 @@ public class StoreFilters {
 
     public String getState() {
         return state;
+    }
+
+    public String getPriceRange() {
+        return priceRange;
     }
 
     public Boolean getHasWebsite() {

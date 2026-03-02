@@ -9,6 +9,7 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -136,6 +137,8 @@ public class PortalDataService {
                   s.phone,
                   s.city,
                   s.state,
+                  s.lat,
+                  s.lng,
                   s.rating,
                   s.rating_count,
                   sp.description,
@@ -158,6 +161,8 @@ public class PortalDataService {
         out.put("phone", row.get("phone"));
         out.put("city", row.get("city"));
         out.put("state", row.get("state"));
+        out.put("lat", row.get("lat"));
+        out.put("lng", row.get("lng"));
         out.put("rating", asDouble(row.get("rating")));
         out.put("reviewCount", asLong(row.get("rating_count")));
         out.put("description", Objects.toString(row.get("description"), ""));
@@ -174,6 +179,12 @@ public class PortalDataService {
         String nextAddress = fallback(request.address, current.get("address"));
         String nextPhone = fallback(request.phone, current.get("phone"));
         String nextDescription = fallback(request.description, current.get("description"));
+        boolean addressChanged = !equalsIgnoreCase(
+                normalizeOptional(nextAddress),
+                normalizeOptional(Objects.toString(current.get("address"), null))
+        );
+        Double nextLat = addressChanged ? null : asDouble(current.get("lat"));
+        Double nextLng = addressChanged ? null : asDouble(current.get("lng"));
 
         Map<String, Object> nextHours = request.hours == null
                 ? castMap(current.get("hours"))
@@ -185,6 +196,8 @@ public class PortalDataService {
                 set name = :name,
                     address = :address,
                     phone = :phone,
+                    lat = :lat,
+                    lng = :lng,
                     updated_at = now()
                 where id = :storeId
                 """,
@@ -193,6 +206,8 @@ public class PortalDataService {
                         .addValue("name", nextName)
                         .addValue("address", nextAddress)
                         .addValue("phone", nextPhone)
+                        .addValue("lat", nextLat)
+                        .addValue("lng", nextLng)
         );
 
         jdbc.update(
@@ -398,10 +413,15 @@ public class PortalDataService {
                   coalesce(sv.name, 'General Service') as service_name,
                   sr.created_at,
                   sr.rating,
-                  sr.comment
+                  sr.comment,
+                  srr.reply_text as owner_response,
+                  srr.updated_at as owner_response_at,
+                  coalesce(ou.display_name, 'Shop Owner') as owner_response_by
                 from store_reviews sr
                 left join users u on u.id = sr.user_id
                 left join services sv on sv.id = sr.service_id
+                left join store_review_replies srr on srr.review_id = sr.id
+                left join users ou on ou.id = srr.owner_user_id
                 where sr.store_id = :storeId
                 order by sr.created_at desc
                 limit 5
@@ -418,6 +438,9 @@ public class PortalDataService {
             item.put("date", toIso(row.get("created_at")));
             item.put("rating", asInt(row.get("rating")));
             item.put("reviewText", row.get("comment"));
+            item.put("ownerResponse", normalizeOptional(Objects.toString(row.get("owner_response"), null)));
+            item.put("ownerResponseAt", toIso(row.get("owner_response_at")));
+            item.put("ownerResponseBy", row.get("owner_response_by"));
             recentReviews.add(item);
         }
 
@@ -433,6 +456,119 @@ public class PortalDataService {
         out.put("stats", stats);
         out.put("topServices", topServiceItems);
         out.put("recentReviews", recentReviews);
+        return out;
+    }
+
+    public List<Map<String, Object>> listManagedReviews(UUID ownerUserId) {
+        UUID storeId = resolveManagedStoreId(ownerUserId);
+        return listStoreReviewsWithReplies(storeId);
+    }
+
+    public Map<String, Object> respondToManagedReview(UUID ownerUserId, UUID reviewId, String response) {
+        UUID normalizedOwnerUserId = requireUuid(ownerUserId, "ownerUserId is required");
+        UUID normalizedReviewId = requireUuid(reviewId, "reviewId is required");
+        String normalizedResponse = normalizeRequired(response, "response is required");
+        UUID storeId = resolveManagedStoreId(normalizedOwnerUserId);
+
+        Long reviewMatch = jdbc.queryForObject(
+                """
+                select count(*)
+                from store_reviews
+                where id = :reviewId
+                  and store_id = :storeId
+                """,
+                new MapSqlParameterSource()
+                        .addValue("reviewId", normalizedReviewId)
+                        .addValue("storeId", storeId),
+                Long.class
+        );
+        if (reviewMatch == null || reviewMatch == 0L) {
+            throw new ResponseStatusException(NOT_FOUND, "Review not found for your managed shop.");
+        }
+
+        jdbc.update(
+                """
+                insert into store_review_replies (review_id, owner_user_id, reply_text, created_at, updated_at)
+                values (:reviewId, :ownerUserId, :replyText, now(), now())
+                on conflict (review_id)
+                do update set
+                  owner_user_id = excluded.owner_user_id,
+                  reply_text = excluded.reply_text,
+                  updated_at = now()
+                """,
+                new MapSqlParameterSource()
+                        .addValue("reviewId", normalizedReviewId)
+                        .addValue("ownerUserId", normalizedOwnerUserId)
+                        .addValue("replyText", normalizedResponse)
+        );
+
+        Map<String, Object> row = querySingleMap(
+                """
+                select
+                  sr.id,
+                  coalesce(srr.reply_text, '') as owner_response,
+                  srr.updated_at as owner_response_at,
+                  coalesce(ou.display_name, 'Shop Owner') as owner_response_by
+                from store_reviews sr
+                left join store_review_replies srr on srr.review_id = sr.id
+                left join users ou on ou.id = srr.owner_user_id
+                where sr.id = :reviewId
+                """,
+                new MapSqlParameterSource("reviewId", normalizedReviewId)
+        );
+        if (row == null) {
+            throw new ResponseStatusException(NOT_FOUND, "Review not found.");
+        }
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("id", row.get("id"));
+        out.put("ownerResponse", normalizeOptional(Objects.toString(row.get("owner_response"), null)));
+        out.put("ownerResponseAt", toIso(row.get("owner_response_at")));
+        out.put("ownerResponseBy", row.get("owner_response_by"));
+        return out;
+    }
+
+    public List<Map<String, Object>> listStoreReviewsWithReplies(UUID storeId) {
+        UUID normalizedStoreId = requireUuid(storeId, "storeId is required");
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                """
+                select
+                  sr.id,
+                  sr.store_id,
+                  sr.user_id,
+                  sr.service_id,
+                  sr.receipt_id,
+                  sr.rating,
+                  sr.comment,
+                  sr.created_at,
+                  srr.reply_text as owner_response,
+                  srr.updated_at as owner_response_at,
+                  coalesce(ou.display_name, 'Shop Owner') as owner_response_by
+                from store_reviews sr
+                left join store_review_replies srr on srr.review_id = sr.id
+                left join users ou on ou.id = srr.owner_user_id
+                where sr.store_id = :storeId
+                order by sr.created_at desc
+                """,
+                new MapSqlParameterSource("storeId", normalizedStoreId)
+        );
+
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Map<String, Object> row : rows) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("id", row.get("id"));
+            item.put("storeId", row.get("store_id"));
+            item.put("userId", row.get("user_id"));
+            item.put("serviceId", row.get("service_id"));
+            item.put("receiptId", row.get("receipt_id"));
+            item.put("rating", asInt(row.get("rating")));
+            item.put("comment", row.get("comment"));
+            item.put("createdAt", toOffsetDateTime(row.get("created_at")));
+            item.put("ownerResponse", normalizeOptional(Objects.toString(row.get("owner_response"), null)));
+            item.put("ownerResponseAt", toOffsetDateTime(row.get("owner_response_at")));
+            item.put("ownerResponseBy", row.get("owner_response_by"));
+            out.add(item);
+        }
         return out;
     }
 
@@ -954,6 +1090,36 @@ public class PortalDataService {
         out.put("flaggedReviews", flagged);
         out.put("pendingShops", pending);
         return out;
+    }
+
+    public List<Map<String, Object>> listAdminUsers(int requestedLimit) {
+        int safeLimit = Math.max(1, Math.min(requestedLimit, 200));
+        List<Map<String, Object>> userRows = jdbc.queryForList(
+                """
+                select
+                  id,
+                  coalesce(display_name, 'User') as name,
+                  email,
+                  role,
+                  created_at
+                from users
+                order by created_at desc
+                limit :limit
+                """,
+                new MapSqlParameterSource("limit", safeLimit)
+        );
+
+        List<Map<String, Object>> users = new ArrayList<>();
+        for (Map<String, Object> row : userRows) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("id", row.get("id"));
+            item.put("name", row.get("name"));
+            item.put("email", row.get("email"));
+            item.put("type", row.get("role"));
+            item.put("joined", toIso(row.get("created_at")));
+            users.add(item);
+        }
+        return users;
     }
 
     public Map<String, Object> getUserDashboard(UUID userId) {
@@ -1559,6 +1725,29 @@ public class PortalDataService {
             return instant.atOffset(ZoneOffset.UTC).toString();
         }
         return value.toString();
+    }
+
+    private OffsetDateTime toOffsetDateTime(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof OffsetDateTime odt) {
+            return odt;
+        }
+        if (value instanceof Timestamp ts) {
+            return ts.toInstant().atOffset(ZoneOffset.UTC);
+        }
+        if (value instanceof Instant instant) {
+            return instant.atOffset(ZoneOffset.UTC);
+        }
+        if (value instanceof String text) {
+            try {
+                return OffsetDateTime.parse(text);
+            } catch (DateTimeParseException ignored) {
+                return null;
+            }
+        }
+        return null;
     }
 
     private String coalesceString(Object value, String fallback) {

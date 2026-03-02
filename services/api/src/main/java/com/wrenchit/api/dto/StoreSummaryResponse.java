@@ -15,4 +15,5 @@ public class StoreSummaryResponse {
     public Double lng;
     public Double rating;
     public Integer ratingCount;
+    public String priceRange;
 }

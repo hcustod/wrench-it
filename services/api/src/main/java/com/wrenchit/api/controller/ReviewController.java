@@ -46,7 +46,7 @@ public class ReviewController {
     @GetMapping
     public List<ReviewResponse> list(@PathVariable UUID storeId) {
         assertStoreExists(storeId);
-        return reviewService.listForStore(storeId).stream().map(this::toResponse).toList();
+        return portalDataService.listStoreReviewsWithReplies(storeId).stream().map(this::toResponse).toList();
     }
 
     @PostMapping
@@ -83,6 +83,22 @@ public class ReviewController {
         res.rating = review.getRating();
         res.comment = review.getComment();
         res.createdAt = review.getCreatedAt();
+        return res;
+    }
+
+    private ReviewResponse toResponse(java.util.Map<String, Object> row) {
+        ReviewResponse res = new ReviewResponse();
+        res.id = (UUID) row.get("id");
+        res.storeId = (UUID) row.get("storeId");
+        res.userId = (UUID) row.get("userId");
+        res.serviceId = (UUID) row.get("serviceId");
+        res.receiptId = (UUID) row.get("receiptId");
+        res.rating = row.get("rating") instanceof Number number ? number.intValue() : 0;
+        res.comment = row.get("comment") == null ? null : row.get("comment").toString();
+        res.createdAt = row.get("createdAt") instanceof java.time.OffsetDateTime createdAt ? createdAt : null;
+        res.ownerResponse = row.get("ownerResponse") == null ? null : row.get("ownerResponse").toString();
+        res.ownerResponseAt = row.get("ownerResponseAt") instanceof java.time.OffsetDateTime ownerResponseAt ? ownerResponseAt : null;
+        res.ownerResponseBy = row.get("ownerResponseBy") == null ? null : row.get("ownerResponseBy").toString();
         return res;
     }
 }

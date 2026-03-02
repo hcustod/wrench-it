@@ -16,6 +16,7 @@ public class ReviewRequest {
     @Size(max = 2000)
     public String comment;
 
+    @NotNull(message = "Service is required.")
     public UUID serviceId;
 
     public UUID receiptId;

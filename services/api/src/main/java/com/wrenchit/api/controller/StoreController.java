@@ -65,15 +65,19 @@ public class StoreController {
                                       @RequestParam(value = "services", required = false) String services,
                                       @RequestParam(value = "city", required = false) String city,
                                       @RequestParam(value = "state", required = false) String state,
+                                      @RequestParam(value = "priceRange", required = false) String priceRange,
                                       @RequestParam(value = "hasWebsite", required = false) Boolean hasWebsite,
                                       @RequestParam(value = "hasPhone", required = false) Boolean hasPhone,
                                       @RequestParam(value = "openNow", required = false) Boolean openNow) {
-        StoreFilters filters = new StoreFilters(minRating, services, city, state, hasWebsite, hasPhone, openNow);
+        StoreFilters filters = new StoreFilters(minRating, services, city, state, priceRange, hasWebsite, hasPhone, openNow);
         StoreSearchCriteria criteria = new StoreSearchCriteria(query, limit, offset, sort, direction, lat, lng, radiusKm, filters);
         StoreSearchResult result = storeService.search(criteria);
+        Map<UUID, String> priceRanges = storeService.getPriceRanges(result.getStores());
 
         StoreSearchResponse response = new StoreSearchResponse();
-        response.items = result.getStores().stream().map(this::toSummary).toList();
+        response.items = result.getStores().stream()
+                .map(store -> toSummary(store, priceRanges.get(store.getId())))
+                .toList();
         response.limit = result.getLimit();
         response.offset = result.getOffset();
         response.total = result.getTotal();
@@ -84,7 +88,7 @@ public class StoreController {
     public StoreDetailResponse getById(@PathVariable UUID id) {
         Store store = storeService.getById(id)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Store not found"));
-        return toDetail(store);
+        return toDetail(store, storeService.getPriceRange(store.getId()));
     }
 
     @GetMapping("/place/{placeId}")
@@ -94,7 +98,7 @@ public class StoreController {
         if (store == null) {
             throw new ResponseStatusException(NOT_FOUND, "Store not found");
         }
-        return toDetail(store);
+        return toDetail(store, storeService.getPriceRange(store.getId()));
     }
 
     @GetMapping("/compare")
@@ -144,7 +148,7 @@ public class StoreController {
         return direction == SortDirection.DESC ? comparator.reversed() : comparator;
     }
 
-    private StoreSummaryResponse toSummary(Store store) {
+    private StoreSummaryResponse toSummary(Store store, String priceRange) {
         StoreSummaryResponse res = new StoreSummaryResponse();
         res.id = store.getId();
         res.googlePlaceId = store.getGooglePlaceId();
@@ -158,12 +162,13 @@ public class StoreController {
         res.lng = store.getLng();
         res.rating = store.getRating();
         res.ratingCount = store.getRatingCount();
+        res.priceRange = priceRange;
         return res;
     }
 
-    private StoreDetailResponse toDetail(Store store) {
+    private StoreDetailResponse toDetail(Store store, String priceRange) {
         StoreDetailResponse res = new StoreDetailResponse();
-        StoreSummaryResponse summary = toSummary(store);
+        StoreSummaryResponse summary = toSummary(store, priceRange);
         res.id = summary.id;
         res.googlePlaceId = summary.googlePlaceId;
         res.name = summary.name;
@@ -176,6 +181,7 @@ public class StoreController {
         res.lng = summary.lng;
         res.rating = summary.rating;
         res.ratingCount = summary.ratingCount;
+        res.priceRange = summary.priceRange;
         res.phone = store.getPhone();
         res.website = store.getWebsite();
         res.servicesText = store.getServicesText();

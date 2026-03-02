@@ -1,15 +1,9 @@
 package com.wrenchit.api.controller;
 
-import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.UUID;
 
-import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
-import org.springframework.http.ContentDisposition;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.InvalidMediaTypeException;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -22,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.wrenchit.api.dto.ReceiptDecisionRequest;
+import com.wrenchit.api.controller.support.ReceiptFileResponseFactory;
 import com.wrenchit.api.service.PortalDataService;
 import com.wrenchit.api.service.UserService;
 
@@ -31,10 +26,14 @@ public class MechanicController {
 
     private final PortalDataService portalDataService;
     private final UserService userService;
+    private final ReceiptFileResponseFactory receiptFileResponseFactory;
 
-    public MechanicController(PortalDataService portalDataService, UserService userService) {
+    public MechanicController(PortalDataService portalDataService,
+                              UserService userService,
+                              ReceiptFileResponseFactory receiptFileResponseFactory) {
         this.portalDataService = portalDataService;
         this.userService = userService;
+        this.receiptFileResponseFactory = receiptFileResponseFactory;
     }
 
     @GetMapping("/dashboard")
@@ -55,22 +54,7 @@ public class MechanicController {
                                                 @AuthenticationPrincipal Jwt jwt) {
         userService.requireAppRole(jwt, "MECHANIC");
         var file = portalDataService.loadReceiptFile(id);
-
-        MediaType mediaType;
-        try {
-            mediaType = MediaType.parseMediaType(file.mimeType());
-        } catch (InvalidMediaTypeException ex) {
-            mediaType = MediaType.APPLICATION_OCTET_STREAM;
-        }
-
-        ContentDisposition disposition = ContentDisposition.inline()
-                .filename(file.originalFilename(), StandardCharsets.UTF_8)
-                .build();
-
-        return ResponseEntity.ok()
-                .contentType(mediaType)
-                .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
-                .body(new FileSystemResource(file.path()));
+        return receiptFileResponseFactory.from(file);
     }
 
     @PostMapping("/receipts/{id}/decision")

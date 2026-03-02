@@ -1,77 +1,46 @@
-# Current WrenchIt Backend
+# WrenchIt
 
-WrenchIt uses a multi-module Spring Boot backend for a mechanic marketplace.
-It provides store search (including optional Google Places integration), reviews, saved shops, and user profile linkage via Keycloak-compatible JWTs.
+WrenchIt is an auto service finder application. 
 
-## Repo Structure
-- `services/api` — HTTP API gateway (controllers + security)
-- `services/stores` — store domain, search, Google Places integration
-- `services/engagement` — reviews and saved shops
-- `services/auth` — auth helper service (resource server + `/auth/me`)
-- `main` — (IN PROGRESS) - app module
-- `docker-compose.yml` — Postgres + Keycloak + ClamAV
+Our goal is to connect users to desired auto service stores more easily. 
 
-## Requirements
-- Java 21
-- Maven (or `./mvnw`)
-- Docker (for Postgres/Keycloak)
+Users can register, search and compare repair shops, view shop details, save shops, and manage portal workflows through a single web application.
+User can review stores, and upload reciepts of services for verification. 
 
-## Quick Start
-1) Create your local secrets file:
-```
-cp .env.example .env
-```
-Update `.env` with your real passwords and runtime values. `.env` is git-ignored.
+Store owners can create a profile then manage store listings by provide details such as services offered, location, and phone. 
+We are excited to implement a full booking system in future releases. 
 
-2) Start infrastructure:
-```
-docker-compose up -d
-```
+## Tools and Tech
+- Frontend: React + Vite, served by Caddy
+- Backend: Java 21, Spring Boot (modular services in `services/*`)
+- Data: PostgreSQL
+- Auth: Keycloak (JWT/OIDC)
+- Deployment: Docker
+- Integrations: Google Places / Google Maps (optional), ClamAV (file scan service - work in progress)
 
-3) Run API service (optional if not using the compose `api` container):
-```
-./mvnw -pl services/api -am spring-boot:run
-```
+## What You Need
+- Docker + Docker Compose
+- A local `.env` file (copied from `.env.example`)
 
-4) (Optional) Run auth service:
-```
-./mvnw -pl services/auth -am spring-boot:run
-```
+Required values in `.env`:
+- `POSTGRES_AUTH_PASSWORD`
+- `POSTGRES_APP_PASSWORD`
+- `POSTGRES_KC_PASSWORD`
+- `KEYCLOAK_ADMIN_PASSWORD`
+- `KEYCLOAK_DEMO_USER_PASSWORD`
+- `KEYCLOAK_DEMO_ADMIN_PASSWORD`
 
-Demo URLs:
-- Frontend: `http://localhost:8081`
-- API health: `http://localhost:8080/actuator/health`
-- Keycloak admin: `http://localhost:8082/admin`
+Optional (to change in future releases):
+- `GOOGLE_PLACES_API_KEY`
+- `WRENCHIT_FRONTEND_GOOGLE_MAPS_API_KEY`
 
-### Local Map Key
-Browser maps keys are inherently public client-side keys. Keep them out of git by setting only in your local files/environment.
-
-1) Set `WRENCHIT_FRONTEND_GOOGLE_MAPS_API_KEY` in your local `.env`.
-
-2) Rebuild frontend container:
-```
-docker-compose up -d --build www
-```
-
-3) Open `http://localhost:8081/search`.
-
-## Build
-Build all modules:
-```
-./mvnw clean install
-```
-
-Build only API:
-```
-./mvnw -pl services/api -am clean install
-```
-
-## Configuration
-Default configuration is in `services/api/src/main/resources/application.yml`.
-Runtime secrets are expected from your local `.env` (for docker-compose) or environment variables.
+## A simple Configuration Example
+- Default API config: `services/api/src/main/resources/application.yml`
+- Runtime/local secrets: `.env` (used by `docker compose`)
+- `.env` is UNTRACKED and should NEVER be committed
 
 Key env vars:
-- `POSTGRES_APP_HOST` (default `localhost`)
+- `POSTGRES_APP_HOST` (default `localhost` for direct API run; compose uses `db_app`)
 - `POSTGRES_APP_PORT` (default `5432`)
 - `POSTGRES_APP_DB` (default `wrenchit_app`)
 - `POSTGRES_APP_USER` (default `wrenchit_app_user`)
@@ -81,42 +50,46 @@ Key env vars:
 - `KEYCLOAK_ADMIN_PASSWORD` (required for compose)
 - `KEYCLOAK_DEMO_USER_PASSWORD` (required for realm import)
 - `KEYCLOAK_DEMO_ADMIN_PASSWORD` (required for realm import)
-- `GOOGLE_PLACES_API_KEY` (optional)
+- `GOOGLE_PLACES_API_KEY` (optional, backend Places integration)
+- `WRENCHIT_FRONTEND_GOOGLE_MAPS_API_KEY` (optional, frontend map rendering)
 
-Google Places integration (disabled by default):
-```
+Google backend config in `application.yml`:
+```yaml
 wrenchit:
   google:
-    enabled: true
-    api-key: ${GOOGLE_PLACES_API_KEY}
+    enabled: ${WRENCHIT_GOOGLE_ENABLED:false}
+    api-key: ${GOOGLE_PLACES_API_KEY:}
 ```
 
-## Core Endpoints
-Base URL: `http://localhost:8080`
-
-Store search:
-- `GET /api/stores/search?q=brakes&limit=20&offset=0`
-- Optional filters: `minRating`, `services`, `city`, `state`, `hasWebsite`, `hasPhone`, `openNow`
-- Optional geo: `lat`, `lng`, `radiusKm`
-
-Store details:
-- `GET /api/stores/{id}`
-- `GET /api/stores/place/{placeId}` (syncs from Google if enabled)
-
-Compare stores:
-- `GET /api/stores/compare?ids=uuid&ids=uuid&sort=RATING&direction=DESC`
-
-Reviews:
-- `GET /api/stores/{storeId}/reviews`
-- `POST /api/stores/{storeId}/reviews`
-
-Saved shops:
-- `POST /api/stores/{storeId}/save`
-- `DELETE /api/stores/{storeId}/save`
-- `GET /api/me/saved`
-
+If you update `WRENCHIT_FRONTEND_GOOGLE_MAPS_API_KEY`, rebuild the frontend container:
+```bash
+docker compose up -d --build www
 ```
 
-## Notes
-- Auth is handled via JWT resource server configuration. Keycloak setup is expected but not required for local.
-- Search uses Postgres full-text search + trigram matching. Radius search uses a Haversine query.
+## Bring the App Up
+1. Create local env file:
+```bash
+cp .env.example .env
+```
+2. Edit `.env` and fill required values.
+3. Start the full stack:
+```bash
+docker compose up --build -d
+```
+4. Open:
+- Frontend: `http://localhost:8081`
+- API health (via frontend proxy): `http://localhost:8081/api/actuator/health`
+- Keycloak admin: `http://localhost:8082/admin`
+
+First startup can take a few minutes because Maven dependencies are installed in the `api` container.
+
+## Useful Commands
+- Stop:
+```bash
+docker compose down
+```
+- Full reset (containers + volumes):
+```bash
+docker compose down -v
+docker compose up --build -d
+```

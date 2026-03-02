@@ -6,9 +6,10 @@ import {
   LuMessageSquare,
   LuSettings2,
   LuDollarSign,
+  LuCornerDownRight,
 } from 'react-icons/lu';
 import StatsCard from '../components/dashboard/StatsCard.jsx';
-import { getMyShopDashboard } from '../api/shop.js';
+import { getMyShopDashboard, respondToMyShopReview } from '../api/shop.js';
 
 const EMPTY_SHOP_PROFILE = {
   name: 'Your Shop',
@@ -31,6 +32,7 @@ export default function ShopOwnerDashboardPage() {
   const [topServices, setTopServices] = useState([]);
   const [recentReviews, setRecentReviews] = useState([]);
   const [error, setError] = useState('');
+  const [respondingReviewId, setRespondingReviewId] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -57,6 +59,45 @@ export default function ShopOwnerDashboardPage() {
       cancelled = true;
     };
   }, []);
+
+  async function handleRespondToReview(review) {
+    if (!review?.id) return;
+
+    const currentResponse = typeof review.ownerResponse === 'string' ? review.ownerResponse : '';
+    const nextResponse = window.prompt(
+      'Write your response to this review:',
+      currentResponse,
+    );
+    if (nextResponse == null) return;
+
+    const trimmed = nextResponse.trim();
+    if (!trimmed) {
+      setError('Response cannot be empty.');
+      return;
+    }
+
+    setRespondingReviewId(review.id);
+    try {
+      const updated = await respondToMyShopReview(review.id, { response: trimmed });
+      setRecentReviews((current) =>
+        current.map((item) =>
+          item.id === review.id
+            ? {
+                ...item,
+                ownerResponse: updated?.ownerResponse ?? trimmed,
+                ownerResponseAt: updated?.ownerResponseAt ?? item.ownerResponseAt,
+                ownerResponseBy: updated?.ownerResponseBy ?? item.ownerResponseBy,
+              }
+            : item,
+        ),
+      );
+      setError('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save review response.');
+    } finally {
+      setRespondingReviewId('');
+    }
+  }
 
   return (
     <>
@@ -244,6 +285,37 @@ export default function ShopOwnerDashboardPage() {
                       </div>
                     </div>
                     <p className="wt-text-muted small mb-0">{review.reviewText}</p>
+                    {review.ownerResponse && (
+                      <div
+                        className="rounded-4 p-3 mt-2"
+                        style={{
+                          backgroundColor: 'rgba(108,99,255,0.12)',
+                          border: '1px solid rgba(108,99,255,0.4)',
+                        }}
+                      >
+                        <p className="text-white small mb-1 d-flex align-items-center gap-2">
+                          <LuCornerDownRight size={14} />
+                          {review.ownerResponseBy ?? 'Shop Owner'} response
+                        </p>
+                        <p className="wt-text-muted small mb-0">{review.ownerResponse}</p>
+                      </div>
+                    )}
+                    <div className="mt-2">
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-wt-outline"
+                        disabled={respondingReviewId === review.id}
+                        onClick={() => {
+                          void handleRespondToReview(review);
+                        }}
+                      >
+                        {respondingReviewId === review.id
+                          ? 'Saving...'
+                          : review.ownerResponse
+                            ? 'Edit response'
+                            : 'Respond'}
+                      </button>
+                    </div>
                   </div>
                 ))}
                 {recentReviews.length === 0 && (
@@ -281,6 +353,12 @@ export default function ShopOwnerDashboardPage() {
                 <button
                   type="button"
                   className="btn btn-sm btn-wt-outline text-start"
+                  disabled={recentReviews.length === 0 || Boolean(respondingReviewId)}
+                  onClick={() => {
+                    const target = recentReviews[0];
+                    if (!target) return;
+                    void handleRespondToReview(target);
+                  }}
                 >
                   Respond to recent reviews
                 </button>

@@ -4,6 +4,8 @@ export default function ReviewCard({
   reviewerName,
   rating,
   reviewText,
+  ownerResponse,
+  ownerResponseBy,
   isVerified = false,
   isMechanicReview = false,
   date,
@@ -41,7 +43,20 @@ export default function ReviewCard({
         </div>
       </div>
       <p className="wt-text-muted mb-0">{reviewText}</p>
+      {ownerResponse && (
+        <div
+          className="rounded-4 p-3 mt-3"
+          style={{
+            backgroundColor: 'rgba(108,99,255,0.12)',
+            border: '1px solid rgba(108,99,255,0.4)',
+          }}
+        >
+          <p className="text-white small mb-1">
+            {ownerResponseBy || 'Shop Owner'} response
+          </p>
+          <p className="wt-text-muted small mb-0">{ownerResponse}</p>
+        </div>
+      )}
     </div>
   );
 }
-

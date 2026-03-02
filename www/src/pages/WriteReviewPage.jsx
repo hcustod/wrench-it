@@ -84,6 +84,10 @@ export default function WriteReviewPage() {
       setError('Rating and review text are required.');
       return;
     }
+    if (!serviceId) {
+      setError('Service performed is required.');
+      return;
+    }
 
     setSubmitting(true);
 
@@ -285,7 +289,7 @@ export default function WriteReviewPage() {
               <button
                 type="submit"
                 className="btn btn-wt-primary flex-grow-1"
-                disabled={!rating || !reviewText.trim() || !storeId || submitting}
+                disabled={!rating || !serviceId || !reviewText.trim() || !storeId || submitting}
               >
                 {submitting ? 'Submitting...' : 'Submit Review'}
               </button>

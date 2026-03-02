@@ -30,6 +30,8 @@ import com.wrenchit.stores.repository.StoreRepository;
 public class StoreService {
 
     private static final double DEFAULT_SIMILARITY = 0.25;
+    private static final int BUDGET_PRICE_MAX_CENTS = 5_000;
+    private static final int MODERATE_PRICE_MAX_CENTS = 15_000;
     private static final Logger log = LoggerFactory.getLogger(StoreService.class);
 
     private final StoreRepository storeRepository;
@@ -50,6 +52,20 @@ public class StoreService {
 
     public Optional<Store> getByPlaceId(String placeId) {
         return storeRepository.findByGooglePlaceId(placeId);
+    }
+
+    public String getPriceRange(UUID storeId) {
+        if (storeId == null) {
+            return null;
+        }
+        return getPriceRangesByIds(List.of(storeId)).get(storeId);
+    }
+
+    public Map<UUID, String> getPriceRanges(List<Store> stores) {
+        if (stores == null || stores.isEmpty()) {
+            return Map.of();
+        }
+        return getPriceRangesByIds(extractIds(stores));
     }
 
     public List<Store> getByIdsOrdered(List<UUID> ids) {
@@ -87,6 +103,7 @@ public class StoreService {
         String servicesContains = filters != null ? normalize(filters.getServicesContains()) : null;
         String city = filters != null ? normalize(filters.getCity()) : null;
         String state = filters != null ? normalize(filters.getState()) : null;
+        String priceRange = filters != null ? normalizePriceRange(filters.getPriceRange()) : null;
         Boolean hasWebsite = filters != null ? filters.getHasWebsite() : null;
         Boolean hasPhone = filters != null ? filters.getHasPhone() : null;
         boolean openNow = filters != null && Boolean.TRUE.equals(filters.getOpenNow());
@@ -96,21 +113,37 @@ public class StoreService {
 
         if (query == null || query.isBlank()) {
             if (hasRadius) {
-                stores = storeRepository.searchWithinRadius(lat, lng, radiusKm, minRating, servicesContains, city, state, hasWebsite, hasPhone, limit, offset);
-                total = storeRepository.countWithinRadius(lat, lng, radiusKm, minRating, servicesContains, city, state, hasWebsite, hasPhone);
+                stores = storeRepository.searchWithinRadius(lat, lng, radiusKm, minRating, servicesContains, city, state, priceRange, hasWebsite, hasPhone, limit, offset);
+                total = storeRepository.countWithinRadius(lat, lng, radiusKm, minRating, servicesContains, city, state, priceRange, hasWebsite, hasPhone);
             } else {
                 Sort sortSpec = toSort(criteria.getSort(), criteria.getDirection(), hasRadius);
-                Page<Store> page = storeRepository.searchAllFiltered(
-                        minRating,
-                        servicesContains,
-                        city,
-                        state,
-                        hasWebsite,
-                        hasPhone,
-                        OffsetLimitPageable.of(limit, offset, sortSpec)
-                );
-                stores = page.getContent();
-                total = page.getTotalElements();
+                if (priceRange == null) {
+                    Page<Store> page = storeRepository.searchAllFiltered(
+                            minRating,
+                            servicesContains,
+                            city,
+                            state,
+                            hasWebsite,
+                            hasPhone,
+                            OffsetLimitPageable.of(limit, offset, sortSpec)
+                    );
+                    stores = page.getContent();
+                    total = page.getTotalElements();
+                } else {
+                    List<Store> all = storeRepository.findAllFiltered(
+                            minRating,
+                            servicesContains,
+                            city,
+                            state,
+                            hasWebsite,
+                            hasPhone,
+                            sortSpec
+                    );
+                    Map<UUID, String> ranges = getPriceRangesByIds(extractIds(all));
+                    List<Store> filtered = filterByPriceRange(all, ranges, priceRange);
+                    total = filtered.size();
+                    stores = paginate(filtered, offset, limit);
+                }
             }
         } else if (!hasRadius && googlePlacesProperties.isEnabled() && hasGoogleApiKeyConfigured()) {
             try {
@@ -126,22 +159,22 @@ public class StoreService {
                 } else {
                     List<Store> matched = storeRepository.findByGooglePlaceIdIn(placeIds);
                     stores = sortByPlaceIdOrder(matched, placeIds);
-                    stores = filterLocalAttributes(stores, minRating, servicesContains, city, state, hasWebsite, hasPhone);
+                    stores = filterLocalAttributes(stores, minRating, servicesContains, city, state, priceRange, hasWebsite, hasPhone);
                 }
                 total = stores.size();
                 stores = paginate(stores, offset, limit);
             } catch (RuntimeException ex) {
                 log.warn("Google Places search failed; falling back to local search. query='{}'", query, ex);
-                stores = storeRepository.searchLocal(query, DEFAULT_SIMILARITY, minRating, servicesContains, city, state, hasWebsite, hasPhone, limit, offset);
-                total = storeRepository.countLocal(query, DEFAULT_SIMILARITY, minRating, servicesContains, city, state, hasWebsite, hasPhone);
+                stores = storeRepository.searchLocal(query, DEFAULT_SIMILARITY, minRating, servicesContains, city, state, priceRange, hasWebsite, hasPhone, limit, offset);
+                total = storeRepository.countLocal(query, DEFAULT_SIMILARITY, minRating, servicesContains, city, state, priceRange, hasWebsite, hasPhone);
             }
         } else {
             if (hasRadius) {
-                stores = storeRepository.searchLocalWithinRadius(query, DEFAULT_SIMILARITY, lat, lng, radiusKm, minRating, servicesContains, city, state, hasWebsite, hasPhone, limit, offset);
-                total = storeRepository.countLocalWithinRadius(query, DEFAULT_SIMILARITY, lat, lng, radiusKm, minRating, servicesContains, city, state, hasWebsite, hasPhone);
+                stores = storeRepository.searchLocalWithinRadius(query, DEFAULT_SIMILARITY, lat, lng, radiusKm, minRating, servicesContains, city, state, priceRange, hasWebsite, hasPhone, limit, offset);
+                total = storeRepository.countLocalWithinRadius(query, DEFAULT_SIMILARITY, lat, lng, radiusKm, minRating, servicesContains, city, state, priceRange, hasWebsite, hasPhone);
             } else {
-                stores = storeRepository.searchLocal(query, DEFAULT_SIMILARITY, minRating, servicesContains, city, state, hasWebsite, hasPhone, limit, offset);
-                total = storeRepository.countLocal(query, DEFAULT_SIMILARITY, minRating, servicesContains, city, state, hasWebsite, hasPhone);
+                stores = storeRepository.searchLocal(query, DEFAULT_SIMILARITY, minRating, servicesContains, city, state, priceRange, hasWebsite, hasPhone, limit, offset);
+                total = storeRepository.countLocal(query, DEFAULT_SIMILARITY, minRating, servicesContains, city, state, priceRange, hasWebsite, hasPhone);
             }
         }
 
@@ -231,8 +264,12 @@ public class StoreService {
                                               String servicesContains,
                                               String city,
                                               String state,
+                                              String priceRange,
                                               Boolean hasWebsite,
                                               Boolean hasPhone) {
+        Map<UUID, String> ranges = priceRange == null
+                ? Map.of()
+                : getPriceRangesByIds(extractIds(stores));
         List<Store> filtered = new ArrayList<>();
         for (Store store : stores) {
             if (minRating != null && (store.getRating() == null || store.getRating() < minRating)) {
@@ -246,6 +283,9 @@ public class StoreService {
                 continue;
             }
             if (state != null && (store.getState() == null || !store.getState().equalsIgnoreCase(state))) {
+                continue;
+            }
+            if (priceRange != null && !priceRange.equals(ranges.get(store.getId()))) {
                 continue;
             }
             if (hasWebsite != null) {
@@ -263,6 +303,101 @@ public class StoreService {
             filtered.add(store);
         }
         return filtered;
+    }
+
+    private List<Store> filterByPriceRange(List<Store> stores, Map<UUID, String> ranges, String priceRange) {
+        if (stores == null || stores.isEmpty() || priceRange == null) {
+            return stores == null ? List.of() : stores;
+        }
+        List<Store> filtered = new ArrayList<>();
+        for (Store store : stores) {
+            if (priceRange.equals(ranges.get(store.getId()))) {
+                filtered.add(store);
+            }
+        }
+        return filtered;
+    }
+
+    private List<UUID> extractIds(List<Store> stores) {
+        if (stores == null || stores.isEmpty()) {
+            return List.of();
+        }
+        List<UUID> ids = new ArrayList<>(stores.size());
+        for (Store store : stores) {
+            if (store != null && store.getId() != null) {
+                ids.add(store.getId());
+            }
+        }
+        return ids;
+    }
+
+    private Map<UUID, String> getPriceRangesByIds(List<UUID> storeIds) {
+        if (storeIds == null || storeIds.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<UUID, String> ranges = new HashMap<>();
+        List<Object[]> rows = storeRepository.findAverageServicePriceCentsByStoreIds(storeIds);
+        for (Object[] row : rows) {
+            if (row == null || row.length < 2 || row[0] == null || row[1] == null) {
+                continue;
+            }
+            UUID storeId = asUuid(row[0]);
+            Integer avgCents = asRoundedCents(row[1]);
+            if (storeId != null && avgCents != null) {
+                ranges.put(storeId, toPriceRange(avgCents));
+            }
+        }
+        return ranges;
+    }
+
+    private String normalizePriceRange(String input) {
+        String normalized = normalize(input);
+        if (normalized == null) {
+            return null;
+        }
+        return switch (normalized) {
+            case "$", "$$", "$$$" -> normalized;
+            default -> null;
+        };
+    }
+
+    private UUID asUuid(Object value) {
+        if (value instanceof UUID uuid) {
+            return uuid;
+        }
+        if (value instanceof String text) {
+            try {
+                return UUID.fromString(text);
+            } catch (IllegalArgumentException ignored) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    private Integer asRoundedCents(Object value) {
+        if (value instanceof Number number) {
+            return (int) Math.round(number.doubleValue());
+        }
+        if (value instanceof String text) {
+            try {
+                return (int) Math.round(Double.parseDouble(text));
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    private String toPriceRange(int avgCents) {
+        if (avgCents < BUDGET_PRICE_MAX_CENTS) {
+            return "$";
+        }
+        if (avgCents < MODERATE_PRICE_MAX_CENTS) {
+            return "$$";
+        }
+        return "$$$";
     }
 
     private List<Store> paginate(List<Store> stores, int offset, int limit) {

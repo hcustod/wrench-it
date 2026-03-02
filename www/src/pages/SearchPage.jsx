@@ -41,7 +41,7 @@ function normalizeStore(store) {
     ...store,
     reviewCount: store?.reviewCount ?? store?.ratingCount ?? 0,
     location: store?.location ?? (location || 'Location unavailable'),
-    priceRange: store?.priceRange ?? '$$',
+    priceRange: store?.priceRange ?? 'N/A',
     services: Array.isArray(store?.services)
       ? store.services
       : String(store?.servicesText || '')
@@ -133,8 +133,12 @@ export default function SearchPage() {
 
   function handleTopSearch(e) {
     e.preventDefault();
+    const trimmedLocation = location.trim();
+    if (trimmedLocation.toLowerCase() !== 'current location') {
+      setUserCoords(null);
+    }
     const next = new URLSearchParams();
-    if (location.trim()) next.set('location', location.trim());
+    if (trimmedLocation) next.set('location', trimmedLocation);
     if (searchTerm.trim()) next.set('service', searchTerm.trim());
     setSearchParams(next);
   }
@@ -180,8 +184,8 @@ export default function SearchPage() {
     const nextService = searchParams.get('service') ?? '';
     const nextLocation = searchParams.get('location') ?? '';
     setSearchTerm(nextService);
-    setLocation(nextLocation || 'Current location');
-  }, [searchParams]);
+    setLocation(nextLocation || (userCoords ? 'Current location' : ''));
+  }, [searchParams, userCoords]);
 
   useEffect(() => {
     let cancelled = false;
@@ -209,6 +213,7 @@ export default function SearchPage() {
           offset: 0,
           minRating,
           services: servicesParam,
+          ...(priceRange !== 'all' ? { priceRange } : {}),
           ...(shouldUseLocationText && cityParam ? { city: cityParam } : {}),
           ...(shouldUseLocationText && stateParam ? { state: stateParam } : {}),
           ...(userCoords ? {
@@ -235,7 +240,7 @@ export default function SearchPage() {
     return () => {
       cancelled = true;
     };
-  }, [searchParams, userCoords, distance, minRating, selectedCategory]);
+  }, [searchParams, userCoords, distance, minRating, selectedCategory, priceRange]);
 
   useEffect(() => {
     let disposed = false;

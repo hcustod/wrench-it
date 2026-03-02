@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LuMapPin, LuPhone, LuClock, LuSave } from 'react-icons/lu';
 import { getMyShopProfile, updateMyShopProfile } from '../api/shop.js';
@@ -29,6 +29,8 @@ const EMPTY_FORM = {
   address: '',
   phone: '',
   hours: {},
+  lat: null,
+  lng: null,
 };
 
 const inputStyle = {
@@ -66,6 +68,8 @@ function normalizeFormFromApi(data) {
     address: data?.address ?? '',
     phone: data?.phone ?? '',
     hours: buildHours(data?.hours),
+    lat: data?.lat == null ? null : Number(data.lat),
+    lng: data?.lng == null ? null : Number(data.lng),
   };
 }
 
@@ -87,6 +91,33 @@ function cloneForm(form) {
   };
 }
 
+function resolveMapsApiKey() {
+  const fromRuntime = window.WRENCHIT_CONFIG?.googleMapsApiKey;
+  if (fromRuntime && fromRuntime.trim()) return fromRuntime.trim();
+  const fromVite = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+  if (fromVite && fromVite.trim()) return fromVite.trim();
+  return '';
+}
+
+async function loadGoogleMaps(apiKey) {
+  if (window.google?.maps) return;
+  if (!apiKey) throw new Error('Google Maps API key is missing.');
+
+  if (!window.__wrenchitGoogleMapsLoader) {
+    window.__wrenchitGoogleMapsLoader = new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}`;
+      script.async = true;
+      script.defer = true;
+      script.onload = resolve;
+      script.onerror = () => reject(new Error('Failed to load Google Maps script.'));
+      document.head.appendChild(script);
+    });
+  }
+
+  await window.__wrenchitGoogleMapsLoader;
+}
+
 export default function ManageShopInfoPage() {
   const navigate = useNavigate();
   const [form, setForm] = useState(() => ({ ...EMPTY_FORM, hours: buildHours() }));
@@ -95,6 +126,11 @@ export default function ManageShopInfoPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [mapStatus, setMapStatus] = useState('');
+  const mapHostRef = useRef(null);
+  const mapRef = useRef(null);
+  const mapMarkerRef = useRef(null);
+  const mapsApiKey = useMemo(() => resolveMapsApiKey(), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -123,6 +159,71 @@ export default function ManageShopInfoPage() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    let disposed = false;
+
+    async function initMap() {
+      if (!mapHostRef.current) return;
+
+      if (form.lat == null || form.lng == null) {
+        if (mapMarkerRef.current) {
+          mapMarkerRef.current.setMap(null);
+          mapMarkerRef.current = null;
+        }
+        if (mapHostRef.current) {
+          mapHostRef.current.innerHTML = '';
+        }
+        mapRef.current = null;
+        setMapStatus('Shop coordinates are unavailable for map preview.');
+        return;
+      }
+
+      if (!mapsApiKey) {
+        setMapStatus('Google Maps key is missing. Add it to www/public/config.js and rebuild the www container.');
+        return;
+      }
+
+      setMapStatus('Loading map...');
+      try {
+        await loadGoogleMaps(mapsApiKey);
+        if (disposed) return;
+
+        const center = { lat: Number(form.lat), lng: Number(form.lng) };
+        if (!mapRef.current || mapRef.current.getDiv?.() !== mapHostRef.current) {
+          mapRef.current = new window.google.maps.Map(mapHostRef.current, {
+            center,
+            zoom: 14,
+            mapTypeControl: false,
+            streetViewControl: false,
+            fullscreenControl: true,
+          });
+        } else {
+          mapRef.current.setCenter(center);
+        }
+
+        if (mapMarkerRef.current) {
+          mapMarkerRef.current.setMap(null);
+        }
+        mapMarkerRef.current = new window.google.maps.Marker({
+          map: mapRef.current,
+          position: center,
+          title: form.shopName || 'Shop',
+        });
+
+        setMapStatus('');
+      } catch {
+        if (!disposed) {
+          setMapStatus('Could not load Google Maps API. Check key, billing, and localhost referrer restrictions.');
+        }
+      }
+    }
+
+    initMap();
+    return () => {
+      disposed = true;
+    };
+  }, [form.lat, form.lng, form.shopName, mapsApiKey]);
 
   function handleChange(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -263,16 +364,37 @@ export default function ManageShopInfoPage() {
                     onBlur={(e) => (e.target.style.borderColor = '#3A3652')}
                   />
                   <div
-                    className="mt-3 rounded-4 d-flex align-items-center justify-content-center wt-text-muted"
-                    style={{
-                      backgroundColor: '#2A2740',
-                      border: '1px solid #3A3652',
-                      height: 180,
-                    }}
+                    className="mt-3"
+                    style={{ position: 'relative' }}
                   >
-                    <div className="text-center">
-                      <LuMapPin size={40} style={{ color: '#6C63FF' }} className="mb-2" />
-                      <p className="small mb-0">Interactive map preview</p>
+                    <div
+                      ref={mapHostRef}
+                      className="rounded-4"
+                      style={{
+                        backgroundColor: '#2A2740',
+                        border: '1px solid #3A3652',
+                        height: 180,
+                      }}
+                    />
+                    {mapStatus && (
+                      <div
+                        className="rounded-4 d-flex align-items-center justify-content-center wt-text-muted"
+                        style={{
+                          position: 'absolute',
+                          inset: 0,
+                          backgroundColor: 'rgba(42, 39, 64, 0.92)',
+                        }}
+                      >
+                        <div className="text-center px-3">
+                          <LuMapPin size={40} style={{ color: '#6C63FF' }} className="mb-2" />
+                          <p className="small mb-0">{mapStatus}</p>
+                        </div>
+                      </div>
+                    )}
+                    <div className="small wt-text-muted mt-2">
+                      {form.lat != null && form.lng != null
+                        ? `${Number(form.lat).toFixed(6)}, ${Number(form.lng).toFixed(6)}`
+                        : 'Map preview uses stored shop coordinates.'}
                     </div>
                   </div>
                 </div>

@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.wrenchit.api.dto.AuthLoginRequest;
+import com.wrenchit.api.dto.AuthRecoveryRequest;
 import com.wrenchit.api.dto.AuthRegisterRequest;
 import com.wrenchit.api.service.KeycloakAuthService;
 
@@ -68,6 +69,19 @@ public class AuthController {
 
         Map<String, Object> tokens = keycloakAuthService.refresh(refreshToken);
         return responseWithSession(tokens, "Session refreshed.");
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<Map<String, Object>> forgotPassword(@Validated @RequestBody AuthRecoveryRequest request) {
+        try {
+            keycloakAuthService.initiatePasswordReset(request.email);
+        } catch (ResponseStatusException ignored) {
+            // Always return a generic success response to avoid account/email enumeration
+            // and to keep UX stable when reset-email transport is unavailable.
+        }
+        return ResponseEntity.ok(Map.of(
+                "message", "If an account exists for that email, a password reset link has been sent."
+        ));
     }
 
     @PostMapping("/logout")

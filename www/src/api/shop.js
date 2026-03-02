@@ -47,3 +47,19 @@ export function deleteMyShopService(serviceId) {
 export function getMyShopDashboard() {
   return apiFetch('/shop/me/dashboard');
 }
+
+export function getMyShopReviews() {
+  return apiFetch('/shop/me/reviews');
+}
+
+export function respondToMyShopReview(reviewId, payload) {
+  return apiFetch(`/shop/me/reviews/${reviewId}/response`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      response: payload.response,
+    }),
+  });
+}

@@ -84,11 +84,10 @@ bootstrap-*.properties
 secrets/
 config/secrets/
 **/secrets/**
-**/*secret*
-**/*password*
-**/*token*
-**/*credentials*
-**/*private*
+*.secret
+*.secrets
+*.credentials
+*.private
 
 ############################
 # Docker / Compose / Volumes

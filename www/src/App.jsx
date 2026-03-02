@@ -13,6 +13,8 @@ import ReviewVerificationPage from './pages/ReviewVerificationPage.jsx';
 import MechanicDashboardPage from './pages/MechanicDashboardPage.jsx';
 import ShopOwnerDashboardPage from './pages/ShopOwnerDashboardPage.jsx';
 import AdminDashboardPage from './pages/AdminDashboardPage.jsx';
+import AdminUsersPage from './pages/AdminUsersPage.jsx';
+import AdminReviewPage from './pages/AdminReviewPage.jsx';
 import ManageShopInfoPage from './pages/ManageShopInfoPage.jsx';
 import ManageServicesPage from './pages/ManageServicesPage.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
@@ -115,6 +117,26 @@ export default function App() {
             <ProtectedRoute roles={['ADMIN']}>
               <Layout>
                 <AdminDashboardPage />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/users"
+          element={
+            <ProtectedRoute roles={['ADMIN']}>
+              <Layout>
+                <AdminUsersPage />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/review/:id"
+          element={
+            <ProtectedRoute roles={['ADMIN']}>
+              <Layout>
+                <AdminReviewPage />
               </Layout>
             </ProtectedRoute>
           }

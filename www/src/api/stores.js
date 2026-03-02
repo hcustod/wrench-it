@@ -14,7 +14,8 @@ import { apiFetch } from './client.js';
  *  minRating?: number,
  *  services?: string,
  *  city?: string,
- *  state?: string
+ *  state?: string,
+ *  priceRange?: '$' | '$$' | '$$$'
  * }} [params]
  * @returns {Promise<{ items: Array, limit: number, offset: number, total: number }>}
  */
@@ -34,6 +35,7 @@ export function searchStores(params = {}) {
   if (params.services) search.set('services', params.services);
   if (params.city) search.set('city', params.city);
   if (params.state) search.set('state', params.state);
+  if (params.priceRange) search.set('priceRange', params.priceRange);
 
   const qs = search.toString();
   return apiFetch(`/stores/search${qs ? `?${qs}` : ''}`);

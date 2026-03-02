@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.wrenchit.api.dto.ShopProfileUpdateRequest;
+import com.wrenchit.api.dto.ShopReviewResponseRequest;
 import com.wrenchit.api.dto.ShopServiceUpsertRequest;
 import com.wrenchit.api.service.PortalDataService;
 import com.wrenchit.api.service.UserService;
@@ -78,5 +79,19 @@ public class ShopOwnerController {
     public Map<String, Object> dashboard(@AuthenticationPrincipal Jwt jwt) {
         var user = userService.requireAppRole(jwt, "SHOP_OWNER");
         return portalDataService.getShopDashboard(user.getId());
+    }
+
+    @GetMapping("/reviews")
+    public List<Map<String, Object>> reviews(@AuthenticationPrincipal Jwt jwt) {
+        var user = userService.requireAppRole(jwt, "SHOP_OWNER");
+        return portalDataService.listManagedReviews(user.getId());
+    }
+
+    @PostMapping("/reviews/{reviewId}/response")
+    public Map<String, Object> respondToReview(@PathVariable UUID reviewId,
+                                               @AuthenticationPrincipal Jwt jwt,
+                                               @Validated @RequestBody ShopReviewResponseRequest request) {
+        var user = userService.requireAppRole(jwt, "SHOP_OWNER");
+        return portalDataService.respondToManagedReview(user.getId(), reviewId, request.response);
     }
 }

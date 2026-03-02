@@ -12,11 +12,13 @@ export default function UserRegistrationPage() {
     confirmPassword: '',
   });
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
 
   function handleChange(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
+    setFieldErrors((prev) => ({ ...prev, [field]: undefined }));
     setError('');
     setSuccess('');
   }
@@ -24,6 +26,7 @@ export default function UserRegistrationPage() {
   async function handleSubmit(e) {
     e.preventDefault();
     setError('');
+    setFieldErrors({});
     setSuccess('');
 
     if (form.password !== form.confirmPassword) {
@@ -43,6 +46,9 @@ export default function UserRegistrationPage() {
       navigate(result.returnTo ?? '/dashboard', { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to register.');
+      if (err && typeof err === 'object' && err.errors && typeof err.errors === 'object') {
+        setFieldErrors(err.errors);
+      }
     } finally {
       setLoading(false);
     }
@@ -86,6 +92,11 @@ export default function UserRegistrationPage() {
                   onChange={(e) => handleChange('fullName', e.target.value)}
                 />
               </div>
+              {fieldErrors.fullName && (
+                <div className="small mt-1" style={{ color: '#FF8C42' }}>
+                  {fieldErrors.fullName}
+                </div>
+              )}
             </div>
 
             <div>
@@ -102,6 +113,11 @@ export default function UserRegistrationPage() {
                   onChange={(e) => handleChange('email', e.target.value)}
                 />
               </div>
+              {fieldErrors.email && (
+                <div className="small mt-1" style={{ color: '#FF8C42' }}>
+                  {fieldErrors.email}
+                </div>
+              )}
             </div>
 
             <div>
@@ -118,6 +134,11 @@ export default function UserRegistrationPage() {
                   onChange={(e) => handleChange('password', e.target.value)}
                 />
               </div>
+              {fieldErrors.password && (
+                <div className="small mt-1" style={{ color: '#FF8C42' }}>
+                  {fieldErrors.password}
+                </div>
+              )}
             </div>
 
             <div>

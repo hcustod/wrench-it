@@ -1,26 +1,53 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { LuMail, LuLock, LuLogIn } from 'react-icons/lu';
-import { beginLogin } from '../auth/keycloak.js';
+import { beginLogin, beginPasswordReset } from '../auth/keycloak.js';
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
   const [loading, setLoading] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   async function handleSubmit(e) {
     e.preventDefault();
     setMessage('');
+    setFieldErrors({});
     setLoading(true);
     try {
       const result = await beginLogin({ email, password });
       navigate(result.returnTo ?? '/dashboard', { replace: true });
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'Unable to sign in.');
+      if (err && typeof err === 'object' && err.errors && typeof err.errors === 'object') {
+        setFieldErrors(err.errors);
+      }
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleForgotPassword() {
+    setMessage('');
+    setFieldErrors({});
+    setResetting(true);
+    try {
+      const payload = await beginPasswordReset({ email });
+      setMessage(
+        typeof payload?.message === 'string' && payload.message.trim()
+          ? payload.message
+          : 'If an account exists for that email, a reset link has been sent.',
+      );
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'Unable to start password reset.');
+      if (err && typeof err === 'object' && err.errors && typeof err.errors === 'object') {
+        setFieldErrors(err.errors);
+      }
+    } finally {
+      setResetting(false);
     }
   }
 
@@ -54,9 +81,17 @@ export default function LoginPage() {
                   className="form-control wt-input border-0"
                   placeholder="you@example.com"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    setFieldErrors((prev) => ({ ...prev, email: undefined }));
+                  }}
                 />
               </div>
+              {fieldErrors.email && (
+                <div className="small mt-1" style={{ color: '#FF8C42' }}>
+                  {fieldErrors.email}
+                </div>
+              )}
             </div>
 
             <div>
@@ -70,9 +105,17 @@ export default function LoginPage() {
                   className="form-control wt-input border-0"
                   placeholder="••••••••"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    setFieldErrors((prev) => ({ ...prev, password: undefined }));
+                  }}
                 />
               </div>
+              {fieldErrors.password && (
+                <div className="small mt-1" style={{ color: '#FF8C42' }}>
+                  {fieldErrors.password}
+                </div>
+              )}
             </div>
 
             <div className="d-flex justify-content-between align-items-center small">
@@ -90,8 +133,11 @@ export default function LoginPage() {
                 type="button"
                 className="btn btn-link p-0 small"
                 style={{ color: '#6C63FF', textDecoration: 'none' }}
+                onClick={handleForgotPassword}
+                disabled={resetting}
+                title="Send a reset link to your email."
               >
-                Forgot password?
+                {resetting ? 'Sending reset link...' : 'Forgot password?'}
               </button>
             </div>
 

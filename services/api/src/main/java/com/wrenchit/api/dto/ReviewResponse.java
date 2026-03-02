@@ -12,4 +12,7 @@ public class ReviewResponse {
     public int rating;
     public String comment;
     public OffsetDateTime createdAt;
+    public String ownerResponse;
+    public OffsetDateTime ownerResponseAt;
+    public String ownerResponseBy;
 }

@@ -14,6 +14,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -26,6 +28,7 @@ import com.wrenchit.api.dto.AuthRegisterRequest;
 @Service
 public class KeycloakAuthService {
 
+    private static final Logger log = LoggerFactory.getLogger(KeycloakAuthService.class);
     private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
     private static final TypeReference<List<Map<String, Object>>> LIST_OF_MAP_TYPE = new TypeReference<>() {};
     private static final List<String> ALLOWED_APP_ROLES = List.of("CUSTOMER", "MECHANIC", "SHOP_OWNER");
@@ -98,22 +101,30 @@ public class KeycloakAuthService {
         RegistrationProfile profile = validateAndNormalizeProfile(request, appRole);
 
         String adminToken = fetchAdminToken();
-        String userId = createKeycloakUser(adminToken, email, password, displayName);
-        assignRealmRole(adminToken, userId, keycloakUserRole);
-        if (!keycloakUserRole.equalsIgnoreCase(appRole)) {
-            assignRealmRole(adminToken, userId, appRole);
+        String userId = null;
+        try {
+            userId = createKeycloakUser(adminToken, email, password, displayName);
+            assignRealmRole(adminToken, userId, keycloakUserRole);
+            if (!keycloakUserRole.equalsIgnoreCase(appRole)) {
+                assignRealmRole(adminToken, userId, appRole);
+            }
+            userService.upsertRegisteredUser(
+                    userId,
+                    email,
+                    displayName,
+                    appRole,
+                    profile.phone(),
+                    profile.certificationNumber(),
+                    profile.yearsExperience(),
+                    profile.shopName(),
+                    profile.businessLicense()
+            );
+        } catch (RuntimeException ex) {
+            if (userId != null) {
+                rollbackKeycloakUserQuietly(adminToken, userId);
+            }
+            throw ex;
         }
-        userService.upsertRegisteredUser(
-                userId,
-                email,
-                displayName,
-                appRole,
-                profile.phone(),
-                profile.certificationNumber(),
-                profile.yearsExperience(),
-                profile.shopName(),
-                profile.businessLicense()
-        );
 
         return login(email, password);
     }
@@ -145,12 +156,37 @@ public class KeycloakAuthService {
         );
     }
 
+    public void initiatePasswordReset(String email) {
+        String normalizedEmail = normalizeEmail(email);
+        String adminToken = fetchAdminToken();
+        String userId = lookupUserIdByUsernameOrNull(adminToken, normalizedEmail);
+        if (userId == null) {
+            return;
+        }
+
+        HttpResponse<String> response = putJson(
+                adminUsersEndpoint() + "/" + urlEncode(userId) + "/execute-actions-email",
+                List.of("UPDATE_PASSWORD"),
+                adminToken
+        );
+
+        if (response.statusCode() == 404 || isSuccess(response.statusCode())) {
+            return;
+        }
+
+        Map<String, Object> payload = parseJsonMap(response.body());
+        throw new ResponseStatusException(
+                HttpStatus.BAD_GATEWAY,
+                errorMessage(payload, "Unable to start password reset.")
+        );
+    }
+
     private String fetchAdminToken() {
         if (keycloakAdminUsername == null || keycloakAdminUsername.isBlank()
                 || keycloakAdminPassword == null || keycloakAdminPassword.isBlank()) {
             throw new ResponseStatusException(
                     HttpStatus.INTERNAL_SERVER_ERROR,
-                    "Keycloak admin credentials are not configured for registration."
+                    "Keycloak admin credentials are not configured."
             );
         }
 
@@ -257,6 +293,14 @@ public class KeycloakAuthService {
     }
 
     private String lookupUserIdByUsername(String adminToken, String email) {
+        String userId = lookupUserIdByUsernameOrNull(adminToken, email);
+        if (userId != null) {
+            return userId;
+        }
+        throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Unable to find newly created Keycloak user.");
+    }
+
+    private String lookupUserIdByUsernameOrNull(String adminToken, String email) {
         String url = adminUsersEndpoint() + "?username=" + urlEncode(email) + "&exact=true&max=1";
         HttpResponse<String> response = getJson(url, adminToken);
         if (!isSuccess(response.statusCode())) {
@@ -269,7 +313,7 @@ public class KeycloakAuthService {
 
         List<Map<String, Object>> users = parseJsonList(response.body());
         if (users.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Unable to find newly created Keycloak user.");
+            return null;
         }
 
         Object id = users.getFirst().get("id");
@@ -332,9 +376,31 @@ public class KeycloakAuthService {
         return send(builder.build());
     }
 
+    private HttpResponse<String> putJson(String url, Object body, String bearerToken) {
+        String json = toJson(body);
+        HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(url))
+                .header("Content-Type", "application/json")
+                .PUT(HttpRequest.BodyPublishers.ofString(json));
+        if (bearerToken != null && !bearerToken.isBlank()) {
+            builder.header("Authorization", "Bearer " + bearerToken);
+        }
+
+        return send(builder.build());
+    }
+
     private HttpResponse<String> getJson(String url, String bearerToken) {
         HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(url))
                 .GET();
+        if (bearerToken != null && !bearerToken.isBlank()) {
+            builder.header("Authorization", "Bearer " + bearerToken);
+        }
+
+        return send(builder.build());
+    }
+
+    private HttpResponse<String> deleteJson(String url, String bearerToken) {
+        HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(url))
+                .DELETE();
         if (bearerToken != null && !bearerToken.isBlank()) {
             builder.header("Authorization", "Bearer " + bearerToken);
         }
@@ -503,6 +569,30 @@ public class KeycloakAuthService {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private void rollbackKeycloakUserQuietly(String adminToken, String userId) {
+        try {
+            deleteKeycloakUser(adminToken, userId);
+        } catch (RuntimeException ex) {
+            log.warn("Registration rollback failed for Keycloak user id={}", userId, ex);
+        }
+    }
+
+    private void deleteKeycloakUser(String adminToken, String userId) {
+        HttpResponse<String> response = deleteJson(
+                adminUsersEndpoint() + "/" + urlEncode(userId),
+                adminToken
+        );
+        if (response.statusCode() == 404 || isSuccess(response.statusCode())) {
+            return;
+        }
+
+        Map<String, Object> payload = parseJsonMap(response.body());
+        throw new ResponseStatusException(
+                HttpStatus.BAD_GATEWAY,
+                errorMessage(payload, "Failed to roll back Keycloak user.")
+        );
     }
 
     private boolean isSuccess(int status) {
