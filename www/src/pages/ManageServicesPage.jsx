@@ -371,7 +371,7 @@ export default function ManageServicesPage() {
         </button>
       </div>
 
-      {/* Add Service Modal */}
+      
       {showAddModal && (
         <div
           className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center p-3"

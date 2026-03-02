@@ -95,8 +95,6 @@ public class PortalDataService {
                 "Shop owner profile is missing shop name."
         );
 
-        // When mapping is missing, always create an owner-scoped store record.
-        // Binding to an existing global store by name is unsafe when names collide.
         UUID storeId = jdbc.queryForObject(
                 """
                 insert into stores (name, phone, created_at, updated_at)

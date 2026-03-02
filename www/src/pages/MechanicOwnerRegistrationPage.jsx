@@ -93,7 +93,7 @@ export default function MechanicOwnerRegistrationPage() {
             </div>
           )}
 
-          {/* Role selector */}
+          
           <div
             className="mb-3 rounded-4 p-3"
             style={{ backgroundColor: '#2A2740', border: '2px solid rgba(255,140,66,0.3)' }}
@@ -150,7 +150,7 @@ export default function MechanicOwnerRegistrationPage() {
           </div>
 
           <form onSubmit={handleSubmit} noValidate className="d-flex flex-column gap-3">
-            {/* Common fields */}
+            
             <div>
               <label className="form-label text-white small mb-1">Full Name *</label>
               <div className="input-group">
@@ -258,7 +258,7 @@ export default function MechanicOwnerRegistrationPage() {
               </div>
             </div>
 
-            {/* Conditional fields */}
+            
             {isMechanic ? (
               <div className="row g-2">
                 <div className="col-12 col-md-6">

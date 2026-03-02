@@ -547,8 +547,6 @@ public class KeycloakAuthService {
 
         String[] parts = displayName.trim().split("\\s+");
         if (parts.length <= 1) {
-            // Keycloak may enforce a required last name via profile requirements.
-            // Use first name as a safe fallback so API-first registration stays usable.
             return fallbackFirstName;
         }
 

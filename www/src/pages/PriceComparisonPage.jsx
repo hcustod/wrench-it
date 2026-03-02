@@ -104,7 +104,7 @@ export default function PriceComparisonPage() {
 
   return (
     <>
-      {/* Page Header */}
+      
       <section className="mb-4">
         <div className="mb-2">
           <h1 className="mb-1">Compare Prices</h1>
@@ -114,7 +114,7 @@ export default function PriceComparisonPage() {
         </div>
       </section>
 
-      {/* Service Selection */}
+      
       <section className="mb-4">
         <div className="wt-card">
           <label className="d-block text-white mb-2 small">Select Service</label>
@@ -143,7 +143,7 @@ export default function PriceComparisonPage() {
         </div>
       </section>
 
-      {/* Comparison Table */}
+      
       <section>
         <div className="wt-card p-0">
           <div
@@ -267,7 +267,7 @@ export default function PriceComparisonPage() {
         </div>
       </section>
 
-      {/* Info Box */}
+      
       <section className="mt-4">
         <div
           className="wt-card"

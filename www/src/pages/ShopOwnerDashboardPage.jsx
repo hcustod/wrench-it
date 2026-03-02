@@ -101,7 +101,7 @@ export default function ShopOwnerDashboardPage() {
 
   return (
     <>
-      {/* Header */}
+      
       <section className="mb-4">
         <h1 className="mb-1">Shop Dashboard</h1>
         <p className="wt-text-muted mb-0">
@@ -114,7 +114,7 @@ export default function ShopOwnerDashboardPage() {
         )}
       </section>
 
-      {/* Stats grid */}
+      
       <section className="mb-4">
         <div className="row g-3 g-md-4">
           <div className="col-12 col-sm-6 col-lg-3">
@@ -152,12 +152,12 @@ export default function ShopOwnerDashboardPage() {
         </div>
       </section>
 
-      {/* Main two-column layout */}
+      
       <section>
         <div className="row g-4">
-          {/* Left column */}
+          
           <div className="col-12 col-lg-8 d-flex flex-column gap-4">
-            {/* Shop profile */}
+            
             <div className="wt-card">
               <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-start gap-3 mb-3">
                 <div>
@@ -201,7 +201,7 @@ export default function ShopOwnerDashboardPage() {
               </div>
             </div>
 
-            {/* Services & pricing */}
+            
             <div className="wt-card">
               <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-start gap-3 mb-3">
                 <div>
@@ -244,7 +244,7 @@ export default function ShopOwnerDashboardPage() {
               </div>
             </div>
 
-            {/* Recent reviews */}
+            
             <div className="wt-card">
               <div className="d-flex justify-content-between align-items-center mb-3">
                 <h2 className="h5 text-white mb-0">Recent reviews</h2>
@@ -325,7 +325,7 @@ export default function ShopOwnerDashboardPage() {
             </div>
           </div>
 
-          {/* Right column */}
+          
           <div className="col-12 col-lg-4 d-flex flex-column gap-4">
             <div
               className="wt-card"

@@ -72,7 +72,7 @@ export default function AdminDashboardPage() {
 
   return (
     <>
-      {/* Header */}
+      
       <section className="mb-4">
         <div className="d-flex align-items-center gap-3 mb-1">
           <div
@@ -98,7 +98,7 @@ export default function AdminDashboardPage() {
         )}
       </section>
 
-      {/* Stats grid */}
+      
       <section className="mb-4">
         <div className="row g-3 g-md-4">
           <div className="col-12 col-sm-6 col-lg-3">
@@ -140,10 +140,10 @@ export default function AdminDashboardPage() {
         </div>
       </section>
 
-      {/* Recent users & flagged reviews */}
+      
       <section className="mb-4">
         <div className="row g-4">
-          {/* Recent users */}
+          
           <div className="col-12 col-lg-6">
             <div className="wt-card h-100 d-flex flex-column">
               <div className="d-flex justify-content-between align-items-center mb-3">
@@ -193,7 +193,7 @@ export default function AdminDashboardPage() {
             </div>
           </div>
 
-          {/* Flagged reviews */}
+          
           <div className="col-12 col-lg-6">
             <div className="wt-card h-100 d-flex flex-column">
               <div className="d-flex justify-content-between align-items-center mb-3">
@@ -250,7 +250,7 @@ export default function AdminDashboardPage() {
         </div>
       </section>
 
-      {/* Pending shops table */}
+      
       <section>
         <div className="wt-card">
           <div className="d-flex justify-content-between align-items-center mb-3">
@@ -379,7 +379,7 @@ export default function AdminDashboardPage() {
         </div>
       </section>
 
-      {/* Platform health summary */}
+      
       <section className="mt-4">
         <div className="wt-card">
           <h2 className="h6 text-white mb-3">Platform health</h2>

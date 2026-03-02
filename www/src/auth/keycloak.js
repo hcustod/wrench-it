@@ -136,6 +136,5 @@ export async function logout() {
   try {
     await postAuth('logout', null, 'Logout failed.');
   } catch {
-    // Ignore logout failures on the client. Session may already be cleared.
   }
 }

@@ -29,7 +29,6 @@ export default function HomePage() {
           setFeaturedShops(items.slice(0, 4));
         }
       } catch {
-        // keep existing empty state; backend team can refine handling later
       }
     }
     loadFeatured();
@@ -40,7 +39,7 @@ export default function HomePage() {
 
   return (
     <>
-      {/* Hero Section */}
+      
       <section className="py-5 py-lg-6">
         <div className="container">
           <div className="text-center mb-4 mb-lg-5">
@@ -107,7 +106,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Value Pillars */}
+      
       <section className="py-5">
         <div className="container">
           <div className="row g-4">
@@ -156,7 +155,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Featured Shops */}
+      
       <section className="py-5">
         <div className="container">
           <div className="text-center mb-4 mb-lg-5">

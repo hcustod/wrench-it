@@ -334,7 +334,7 @@ export default function ShopProfilePage() {
 
   return (
     <>
-      {/* Shop Header */}
+      
       <section className="mb-4">
         <div className="wt-card">
           <div className="d-flex flex-column flex-md-row justify-content-between align-items-start gap-4">
@@ -427,10 +427,10 @@ export default function ShopProfilePage() {
         </div>
       </section>
 
-      {/* Tabs container */}
+      
       <section>
         <div className="wt-card p-0">
-          {/* Tabs */}
+          
           <div
             className="d-flex"
             style={{ borderBottom: '1px solid #3A3652' }}
@@ -459,7 +459,7 @@ export default function ShopProfilePage() {
             })}
           </div>
 
-          {/* Tab content */}
+          
           <div className="p-4 p-md-5">
             {error && (
               <div className="small mb-3" style={{ color: '#FF8C42' }}>
@@ -468,7 +468,7 @@ export default function ShopProfilePage() {
             )}
             {activeTab === 'overview' && (
               <div className="d-flex flex-column gap-4">
-                {/* About */}
+                
                 <div>
                   <h3 className="h5 text-white mb-3">About This Shop</h3>
                   <p className="wt-text-muted mb-0">
@@ -477,7 +477,7 @@ export default function ShopProfilePage() {
                   </p>
                 </div>
 
-                {/* Hours */}
+                
                 <div>
                   <h3 className="h5 text-white mb-3">Hours of Operation</h3>
                   <div
@@ -503,7 +503,7 @@ export default function ShopProfilePage() {
                   </div>
                 </div>
 
-                {/* Location map */}
+                
                 <div>
                   <h3 className="h5 text-white mb-3">Location</h3>
                   <div style={{ position: 'relative' }}>

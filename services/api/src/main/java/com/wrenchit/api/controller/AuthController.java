@@ -76,8 +76,6 @@ public class AuthController {
         try {
             keycloakAuthService.initiatePasswordReset(request.email);
         } catch (ResponseStatusException ignored) {
-            // Always return a generic success response to avoid account/email enumeration
-            // and to keep UX stable when reset-email transport is unavailable.
         }
         return ResponseEntity.ok(Map.of(
                 "message", "If an account exists for that email, a password reset link has been sent."

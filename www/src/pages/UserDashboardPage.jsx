@@ -141,7 +141,7 @@ export default function UserDashboardPage() {
 
   return (
     <>
-      {/* Page header */}
+      
       <section className="mb-4">
         <h1 className="mb-1">My Dashboard</h1>
         <p className="wt-text-muted mb-0">
@@ -149,7 +149,7 @@ export default function UserDashboardPage() {
         </p>
       </section>
 
-      {/* Tabs card */}
+      
       <section>
         <div className="wt-card p-0">
           <div
@@ -255,7 +255,7 @@ export default function UserDashboardPage() {
                 )}
                 <h3 className="h5 text-white mb-1">Your Bookings</h3>
 
-                {/* Upcoming */}
+                
                 <div>
                   <h4 className="h6 text-white mb-3">Upcoming</h4>
                   <div className="d-flex flex-column gap-3">
@@ -302,7 +302,7 @@ export default function UserDashboardPage() {
                   </div>
                 </div>
 
-                {/* Past */}
+                
                 <div>
                   <h4 className="h6 text-white mb-3">Past Bookings</h4>
                   <div className="d-flex flex-column gap-3">

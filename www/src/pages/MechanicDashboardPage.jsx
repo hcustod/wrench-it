@@ -49,7 +49,7 @@ export default function MechanicDashboardPage() {
 
   return (
     <>
-      {/* Header */}
+      
       <section className="mb-4">
         <div className="d-flex align-items-center gap-3 mb-1">
           <h1 className="mb-0">Mechanic Dashboard</h1>
@@ -75,7 +75,7 @@ export default function MechanicDashboardPage() {
         )}
       </section>
 
-      {/* Stats grid */}
+      
       <section className="mb-4">
         <div className="row g-3 g-md-4">
           <div className="col-12 col-sm-6 col-lg-3">
@@ -113,7 +113,7 @@ export default function MechanicDashboardPage() {
         </div>
       </section>
 
-      {/* Pending verifications */}
+      
       <section className="mb-4">
         <div className="wt-card">
           <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-3 gap-2">
@@ -181,7 +181,7 @@ export default function MechanicDashboardPage() {
         </div>
       </section>
 
-      {/* Recently verified */}
+      
       <section>
         <div className="wt-card">
           <h2 className="h5 text-white mb-3">Recently Verified</h2>

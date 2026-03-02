@@ -331,7 +331,7 @@ export default function ManageShopInfoPage() {
       )}
 
       <form onSubmit={handleSave}>
-        {/* Basic info */}
+        
         <div className="wt-card mb-4">
           <h2 className="h5 text-white mb-4">Basic Information</h2>
           <div className="d-flex flex-column gap-4">
@@ -419,7 +419,7 @@ export default function ManageShopInfoPage() {
           </div>
         </div>
 
-        {/* Operating hours */}
+        
         <div className="wt-card mb-4">
           <div className="d-flex align-items-center gap-2 mb-4">
             <LuClock size={20} style={{ color: '#FF8C42' }} />
@@ -472,7 +472,7 @@ export default function ManageShopInfoPage() {
           </div>
         </div>
 
-        {/* Description */}
+        
         <div className="wt-card mb-4">
           <h2 className="h5 text-white mb-4">Shop Description</h2>
           <textarea
@@ -490,7 +490,7 @@ export default function ManageShopInfoPage() {
           />
         </div>
 
-        {/* Actions */}
+        
         <div className="d-flex flex-wrap gap-3">
           <button
             type="submit"

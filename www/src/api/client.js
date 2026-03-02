@@ -78,13 +78,6 @@ export async function apiFetchResponse(path, options = {}, allowRefresh = true) 
   return fetchWithSession(url, options, allowRefresh);
 }
 
-/**
- * Centralized API client. Uses relative base URL /api, fetch with credentials,
- * throws on non-ok response, returns parsed JSON.
- * @param {string} path - Path after /api (e.g. "/stores/search?q=foo")
- * @param {RequestInit} [options] - Optional fetch options (merged with credentials)
- * @returns {Promise<any>} Parsed JSON body
- */
 export async function apiFetch(path, options = {}) {
   const res = await apiFetchResponse(path, options, true);
   const payload = await parsePayload(res);

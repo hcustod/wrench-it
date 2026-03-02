@@ -192,7 +192,7 @@ export default function ReviewVerificationPage() {
 
       <section>
         <div className="row g-4">
-          {/* Review details */}
+          
           <div className="col-12 col-lg-6">
             <div className="wt-card">
               <div className="d-flex align-items-center gap-2 mb-3">
@@ -246,7 +246,7 @@ export default function ReviewVerificationPage() {
             </div>
           </div>
 
-          {/* Receipt + actions */}
+          
           <div className="col-12 col-lg-6 d-flex flex-column gap-4">
             <div className="wt-card">
               <div className="d-flex align-items-center gap-2 mb-3">
