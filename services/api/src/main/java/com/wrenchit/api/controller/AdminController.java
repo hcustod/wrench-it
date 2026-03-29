@@ -80,11 +80,19 @@ public class AdminController {
         return portalDataService.decideReceipt(id, user.getId(), request.result, request.notes);
     }
 
-    @PostMapping("/api/admin/pending-shops/{id}/decision")
-    public Map<String, Object> decidePending(@PathVariable UUID id,
-                                             @AuthenticationPrincipal Jwt jwt,
-                                             @Validated @RequestBody ReceiptDecisionRequest request) {
+    @PostMapping("/api/admin/pending-receipts/{id}/decision")
+    public Map<String, Object> decidePendingReceipt(@PathVariable UUID id,
+                                                    @AuthenticationPrincipal Jwt jwt,
+                                                    @Validated @RequestBody ReceiptDecisionRequest request) {
         var user = userService.requireAppRole(jwt, "ADMIN");
         return portalDataService.decideReceipt(id, user.getId(), request.result, request.notes);
+    }
+
+    @PostMapping("/api/admin/shops/{id}/decision")
+    public Map<String, Object> decideShop(@PathVariable UUID id,
+                                          @AuthenticationPrincipal Jwt jwt,
+                                          @Validated @RequestBody ReceiptDecisionRequest request) {
+        var user = userService.requireAppRole(jwt, "ADMIN");
+        return portalDataService.decideShopApproval(id, user.getId(), request.result, request.notes);
     }
 }

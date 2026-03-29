@@ -1,4 +1,22 @@
-import { LuStar, LuBadgeCheck } from 'react-icons/lu';
+import { LuBadgeCheck, LuCircleAlert, LuClock3, LuStar } from 'react-icons/lu';
+
+const VERIFICATION_CONFIG = {
+  VERIFIED: {
+    label: 'Receipt verified',
+    className: 'wt-badge-verified',
+    Icon: LuBadgeCheck,
+  },
+  PENDING: {
+    label: 'Receipt under review',
+    className: 'wt-badge-pending',
+    Icon: LuClock3,
+  },
+  REJECTED: {
+    label: 'Receipt not verified',
+    className: 'wt-badge-rejected',
+    Icon: LuCircleAlert,
+  },
+};
 
 export default function ReviewCard({
   reviewerName,
@@ -6,11 +24,12 @@ export default function ReviewCard({
   reviewText,
   ownerResponse,
   ownerResponseBy,
-  isVerified = false,
-  isMechanicReview = false,
+  verificationStatus,
   date,
 }) {
   const fullStars = Math.round(rating ?? 0);
+  const verification = VERIFICATION_CONFIG[verificationStatus] ?? null;
+  const VerificationIcon = verification?.Icon;
 
   return (
     <div className="wt-card">
@@ -18,11 +37,11 @@ export default function ReviewCard({
         <div>
           <div className="d-flex align-items-center gap-2 mb-1">
             <span className="text-white">{reviewerName}</span>
-            {isVerified && (
-              <LuBadgeCheck size={18} style={{ color: '#6C63FF' }} />
-            )}
-            {isMechanicReview && (
-              <span className="wt-chip-service">Verified Mechanic</span>
+            {verification && VerificationIcon && (
+              <span className={verification.className}>
+                <VerificationIcon size={12} style={{ marginRight: 4 }} />
+                {verification.label}
+              </span>
             )}
           </div>
           <span className="wt-text-muted small">{date}</span>

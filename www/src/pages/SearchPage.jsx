@@ -17,6 +17,23 @@ const CATEGORIES = [
 
 const DEFAULT_MAP_CENTER = { lat: 39.8283, lng: -98.5795 };
 
+function resolveSearchSort(sortBy, hasCoords) {
+  switch (sortBy) {
+    case 'reviews':
+      return { sort: 'REVIEW_COUNT', direction: 'DESC' };
+    case 'name':
+      return { sort: 'NAME', direction: 'ASC' };
+    case 'closest':
+      return hasCoords
+        ? { sort: 'DISTANCE', direction: 'ASC' }
+        : { sort: 'RATING', direction: 'DESC' };
+    case 'rating':
+    case 'best':
+    default:
+      return { sort: 'RATING', direction: 'DESC' };
+  }
+}
+
 function toRad(deg) {
   return (deg * Math.PI) / 180;
 }
@@ -112,9 +129,13 @@ export default function SearchPage() {
   const [minRating, setMinRating] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [priceRange, setPriceRange] = useState('all');
+  const [hasWebsite, setHasWebsite] = useState(false);
+  const [hasPhone, setHasPhone] = useState(false);
+  const [openNow, setOpenNow] = useState(false);
   const [sortBy, setSortBy] = useState('best');
 
   const [stores, setStores] = useState([]);
+  const [resultsTotal, setResultsTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -148,6 +169,9 @@ export default function SearchPage() {
     setMinRating(0);
     setSelectedCategory('all');
     setPriceRange('all');
+    setHasWebsite(false);
+    setHasPhone(false);
+    setOpenNow(false);
     setSortBy('best');
   }
 
@@ -188,6 +212,12 @@ export default function SearchPage() {
   }, [searchParams, userCoords]);
 
   useEffect(() => {
+    if (!userCoords && sortBy === 'closest') {
+      setSortBy('best');
+    }
+  }, [sortBy, userCoords]);
+
+  useEffect(() => {
     let cancelled = false;
 
     async function load() {
@@ -206,14 +236,20 @@ export default function SearchPage() {
         const qParam = qService.trim() || (shouldUseLocationText && !cityParam && !stateParam
           ? qLocation
           : '');
+        const sortRequest = resolveSearchSort(sortBy, Boolean(userCoords));
 
         const response = await searchStores({
           q: qParam,
           limit: 25,
           offset: 0,
+          sort: sortRequest.sort,
+          direction: sortRequest.direction,
           minRating,
           services: servicesParam,
           ...(priceRange !== 'all' ? { priceRange } : {}),
+          ...(hasWebsite ? { hasWebsite: true } : {}),
+          ...(hasPhone ? { hasPhone: true } : {}),
+          ...(openNow ? { openNow: true } : {}),
           ...(shouldUseLocationText && cityParam ? { city: cityParam } : {}),
           ...(shouldUseLocationText && stateParam ? { state: stateParam } : {}),
           ...(userCoords ? {
@@ -225,11 +261,19 @@ export default function SearchPage() {
 
         if (!cancelled) {
           setStores((response?.items ?? []).map(normalizeStore));
+          setResultsTotal(
+            typeof response?.total === 'number'
+              ? response.total
+              : Array.isArray(response?.items)
+                ? response.items.length
+                : 0,
+          );
         }
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : 'Failed to load shops.');
           setStores([]);
+          setResultsTotal(0);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -240,7 +284,7 @@ export default function SearchPage() {
     return () => {
       cancelled = true;
     };
-  }, [searchParams, userCoords, distance, minRating, selectedCategory, priceRange]);
+  }, [searchParams, userCoords, distance, minRating, selectedCategory, priceRange, hasWebsite, hasPhone, openNow, sortBy]);
 
   useEffect(() => {
     let disposed = false;
@@ -279,22 +323,8 @@ export default function SearchPage() {
     };
   }, [mapsApiKey, userCoords]);
 
-  const filteredStores = useMemo(() => {
-    let items = stores;
-
-    if (searchTerm.trim()) {
-      const q = searchTerm.toLowerCase();
-      items = items.filter(
-        (s) => s.name.toLowerCase().includes(q)
-          || s.services?.some((svc) => svc.toLowerCase().includes(q)),
-      );
-    }
-
-    if (priceRange !== 'all') {
-      items = items.filter((s) => s.priceRange === priceRange);
-    }
-
-    const withDistance = items.map((store) => {
+  const displayedStores = useMemo(
+    () => stores.map((store) => {
       if (!userCoords || store.lat == null || store.lng == null) {
         return { ...store, distanceMiles: null };
       }
@@ -302,35 +332,9 @@ export default function SearchPage() {
         ...store,
         distanceMiles: distanceMiles(userCoords.lat, userCoords.lng, store.lat, store.lng),
       };
-    });
-
-    const sorted = [...withDistance];
-    switch (sortBy) {
-      case 'rating':
-        sorted.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
-        break;
-      case 'reviews':
-        sorted.sort((a, b) => (b.reviewCount ?? 0) - (a.reviewCount ?? 0));
-        break;
-      case 'closest':
-        sorted.sort((a, b) => {
-          const ad = a.distanceMiles ?? Number.POSITIVE_INFINITY;
-          const bd = b.distanceMiles ?? Number.POSITIVE_INFINITY;
-          return ad - bd;
-        });
-        break;
-      case 'best':
-      default:
-        sorted.sort((a, b) => {
-          const r = (b.rating ?? 0) - (a.rating ?? 0);
-          if (r !== 0) return r;
-          return (b.reviewCount ?? 0) - (a.reviewCount ?? 0);
-        });
-        break;
-    }
-
-    return sorted;
-  }, [stores, searchTerm, priceRange, sortBy, userCoords]);
+    }),
+    [stores, userCoords],
+  );
 
   useEffect(() => {
     if (!mapReady || !mapRef.current || !window.google?.maps) return;
@@ -378,7 +382,7 @@ export default function SearchPage() {
       bounds.extend(userCoords);
     }
 
-    filteredStores.forEach((store) => {
+    displayedStores.forEach((store) => {
       if (store.lat == null || store.lng == null) return;
       const marker = new window.google.maps.Marker({
         map: mapRef.current,
@@ -399,9 +403,9 @@ export default function SearchPage() {
         mapRef.current.setZoom(11);
       }
     }
-  }, [mapReady, filteredStores, userCoords, distance]);
+  }, [mapReady, displayedStores, userCoords, distance]);
 
-  const resultsCount = filteredStores.length;
+  const resultsCount = displayedStores.length;
 
   return (
     <>
@@ -554,6 +558,39 @@ export default function SearchPage() {
                 </div>
               </div>
 
+              <div className="mb-4">
+                <label className="d-block text-white mb-2 small">Availability &amp; Contact</label>
+                <div className="d-flex flex-column gap-2 small wt-text-muted">
+                  <label className="d-flex align-items-center gap-2">
+                    <input
+                      type="checkbox"
+                      className="form-check-input"
+                      checked={hasWebsite}
+                      onChange={(e) => setHasWebsite(e.target.checked)}
+                    />
+                    <span>Has website</span>
+                  </label>
+                  <label className="d-flex align-items-center gap-2">
+                    <input
+                      type="checkbox"
+                      className="form-check-input"
+                      checked={hasPhone}
+                      onChange={(e) => setHasPhone(e.target.checked)}
+                    />
+                    <span>Has phone number</span>
+                  </label>
+                  <label className="d-flex align-items-center gap-2">
+                    <input
+                      type="checkbox"
+                      className="form-check-input"
+                      checked={openNow}
+                      onChange={(e) => setOpenNow(e.target.checked)}
+                    />
+                    <span>Open now</span>
+                  </label>
+                </div>
+              </div>
+
               <button type="button" className="btn btn-wt-outline w-100 mt-1" onClick={handleResetFilters}>
                 Reset Filters
               </button>
@@ -565,7 +602,7 @@ export default function SearchPage() {
               <div>
                 <h2 className="mb-1">Auto Repair Shops</h2>
                 <p className="wt-text-muted mb-0">
-                  {resultsCount} shops found near {location || 'your area'}
+                  {resultsCount} of {resultsTotal} shops found near {location || 'your area'}
                 </p>
               </div>
               <select
@@ -577,7 +614,8 @@ export default function SearchPage() {
                 <option value="best">Best Match</option>
                 <option value="rating">Highest Rated</option>
                 <option value="reviews">Most Reviews</option>
-                <option value="closest">Closest</option>
+                <option value="name">Name A-Z</option>
+                <option value="closest" disabled={!userCoords}>Closest</option>
               </select>
             </div>
 
@@ -589,10 +627,10 @@ export default function SearchPage() {
             )}
 
             <div className="d-flex flex-column gap-3 mb-4">
-              {filteredStores.map((shop) => (
+              {displayedStores.map((shop) => (
                 <ShopCard key={shop.id} {...shop} />
               ))}
-              {!loading && !error && filteredStores.length === 0 && (
+              {!loading && !error && displayedStores.length === 0 && (
                 <p className="wt-text-muted small mb-0">
                   No shops match your current filters.
                 </p>

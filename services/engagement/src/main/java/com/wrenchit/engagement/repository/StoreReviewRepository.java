@@ -13,7 +13,7 @@ import com.wrenchit.engagement.entity.StoreReview;
 public interface StoreReviewRepository extends JpaRepository<StoreReview, UUID> {
     List<StoreReview> findByStoreIdOrderByCreatedAtDesc(UUID storeId);
 
-    Optional<StoreReview> findByStoreIdAndUserId(UUID storeId, UUID userId);
+    Optional<StoreReview> findByWorkOrderId(UUID workOrderId);
 
     @Query("""
             select r.storeId as storeId,

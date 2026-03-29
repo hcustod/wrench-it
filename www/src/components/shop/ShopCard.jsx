@@ -8,6 +8,7 @@ export default function ShopCard({
   location,
   priceRange,
   services = [],
+  hasVerifiedMechanic = false,
 }) {
   const topServices = services.slice(0, 3);
 
@@ -28,7 +29,9 @@ export default function ShopCard({
 
       <div className="d-flex align-items-center justify-content-between mt-2 mb-3">
         <span className="wt-text-muted small">Price range: {priceRange}</span>
-        <span className="wt-badge-verified">Verified</span>
+        {hasVerifiedMechanic && (
+          <span className="wt-badge-verified">Receipt-backed reviews</span>
+        )}
       </div>
 
       <div className="d-flex flex-wrap gap-2 mb-3">
@@ -47,4 +50,3 @@ export default function ShopCard({
     </div>
   );
 }
-

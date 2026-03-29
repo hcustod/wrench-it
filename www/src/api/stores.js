@@ -17,6 +17,9 @@ export function searchStores(params = {}) {
   if (params.city) search.set('city', params.city);
   if (params.state) search.set('state', params.state);
   if (params.priceRange) search.set('priceRange', params.priceRange);
+  if (typeof params.hasWebsite === 'boolean') search.set('hasWebsite', String(params.hasWebsite));
+  if (typeof params.hasPhone === 'boolean') search.set('hasPhone', String(params.hasPhone));
+  if (typeof params.openNow === 'boolean') search.set('openNow', String(params.openNow));
 
   const qs = search.toString();
   return apiFetch(`/stores/search${qs ? `?${qs}` : ''}`);

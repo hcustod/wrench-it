@@ -10,7 +10,7 @@
     <packaging>pom</packaging>
 
     <name>wrenchit</name>
-    <description>WrenchIT multi-module backend</description>
+    <description>WrenchIT API-focused backend</description>
 
     <properties>
         <java.version>21</java.version>
@@ -30,8 +30,6 @@
     </dependencyManagement>
 
     <modules>
-        <module>main</module>
-        <module>services/auth</module>
         <module>services/api</module>
         <module>services/stores</module>
         <module>services/engagement</module>

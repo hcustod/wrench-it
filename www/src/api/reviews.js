@@ -11,6 +11,7 @@ export function submitReview(storeId, payload) {
   };
   if (payload.serviceId) body.serviceId = payload.serviceId;
   if (payload.receiptId) body.receiptId = payload.receiptId;
+  if (payload.workOrderId) body.workOrderId = payload.workOrderId;
 
   return apiFetch(`/stores/${storeId}/reviews`, {
     method: 'POST',

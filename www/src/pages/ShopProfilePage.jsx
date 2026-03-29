@@ -71,7 +71,6 @@ export default function ShopProfilePage() {
   const [shop, setShop] = useState(null);
   const [services, setServices] = useState([]);
   const [customerReviews, setCustomerReviews] = useState([]);
-  const [mechanicReviews, setMechanicReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [saveMessage, setSaveMessage] = useState('');
@@ -103,24 +102,24 @@ export default function ShopProfilePage() {
 
         const apiReviews = (reviewsRes ?? []).map((rev) => ({
           id: rev.id,
-          reviewerName: 'Customer',
+          reviewerName:
+            typeof rev.reviewerName === 'string' && rev.reviewerName.trim()
+              ? rev.reviewerName
+              : 'Customer',
           rating: Number(rev.rating ?? 0),
           reviewText: rev.comment,
           ownerResponse: rev.ownerResponse ?? '',
           ownerResponseBy: rev.ownerResponseBy ?? 'Shop Owner',
-          isVerified: true,
-          isMechanicReview: false,
+          verificationStatus: rev.verificationStatus ?? 'UNVERIFIED',
           date: formatDate(rev.createdAt),
         }));
         setCustomerReviews(apiReviews);
-        setMechanicReviews([]);
       } catch (err) {
         if (cancelled) return;
         setError(err instanceof Error ? err.message : 'Failed to load shop details.');
         setShop(null);
         setServices([]);
         setCustomerReviews([]);
-        setMechanicReviews([]);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -380,12 +379,18 @@ export default function ShopProfilePage() {
             </div>
 
             <div className="d-flex flex-column gap-2">
+              <Link
+                to={`/request-work-order?storeId=${shop.id}`}
+                className="btn btn-wt-primary text-center"
+              >
+                Request Work Order
+              </Link>
               {dialPhone ? (
-                <a href={`tel:${dialPhone}`} className="btn btn-wt-primary text-center">
+                <a href={`tel:${dialPhone}`} className="btn btn-wt-orange text-center">
                   Call Shop
                 </a>
               ) : (
-                <button type="button" className="btn btn-wt-primary" disabled>
+                <button type="button" className="btn btn-wt-orange" disabled>
                   Call Shop
                 </button>
               )}
@@ -394,12 +399,12 @@ export default function ShopProfilePage() {
                   href={directionsUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="btn btn-wt-orange text-center"
+                  className="btn btn-wt-outline text-center"
                 >
                   Get Directions
                 </a>
               ) : (
-                <button type="button" className="btn btn-wt-orange" disabled>
+                <button type="button" className="btn btn-wt-outline" disabled>
                   Get Directions
                 </button>
               )}
@@ -648,7 +653,12 @@ export default function ShopProfilePage() {
               <div className="d-flex flex-column gap-4">
                 <div>
                   <div className="d-flex justify-content-between align-items-center mb-3">
-                    <h3 className="h5 text-white mb-0">Client Reviews</h3>
+                    <div>
+                      <h3 className="h5 text-white mb-0">Customer Reviews</h3>
+                      <p className="wt-text-muted small mb-0">
+                        Only reviews with an approved receipt are marked as verified.
+                      </p>
+                    </div>
                     <Link
                       to={`/write-review?storeId=${shop.id}`}
                       className="btn btn-sm btn-wt-outline"
@@ -662,18 +672,6 @@ export default function ShopProfilePage() {
                     ))}
                     {customerReviews.length === 0 && (
                       <p className="wt-text-muted small mb-0">No reviews yet.</p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="pt-3" style={{ borderTop: '2px solid rgba(255,140,66,0.3)' }}>
-                  <h3 className="h6 text-white mb-3">Verified Mechanic Reviews</h3>
-                  <div className="d-flex flex-column gap-3">
-                    {mechanicReviews.map((rev) => (
-                      <ReviewCard key={rev.id} {...rev} />
-                    ))}
-                    {mechanicReviews.length === 0 && (
-                      <p className="wt-text-muted small mb-0">No mechanic reviews yet.</p>
                     )}
                   </div>
                 </div>

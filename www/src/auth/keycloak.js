@@ -135,6 +135,7 @@ export async function refreshSession() {
 export async function logout() {
   try {
     await postAuth('logout', null, 'Logout failed.');
-  } catch {
+  } catch (err) {
+    void err;
   }
 }

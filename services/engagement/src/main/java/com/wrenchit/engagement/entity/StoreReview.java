@@ -7,7 +7,7 @@ import jakarta.persistence.*;
 
 @Entity
 @Table(name = "store_reviews", uniqueConstraints = {
-        @UniqueConstraint(name = "uq_store_reviews_store_user", columnNames = {"store_id", "user_id"})
+        @UniqueConstraint(name = "uq_store_reviews_work_order", columnNames = {"work_order_id"})
 })
 public class StoreReview {
 
@@ -26,6 +26,9 @@ public class StoreReview {
 
     @Column(name = "receipt_id")
     private UUID receiptId;
+
+    @Column(name = "work_order_id")
+    private UUID workOrderId;
 
     @Column(nullable = false)
     private int rating;
@@ -75,6 +78,14 @@ public class StoreReview {
 
     public void setReceiptId(UUID receiptId) {
         this.receiptId = receiptId;
+    }
+
+    public UUID getWorkOrderId() {
+        return workOrderId;
+    }
+
+    public void setWorkOrderId(UUID workOrderId) {
+        this.workOrderId = workOrderId;
     }
 
     public int getRating() {

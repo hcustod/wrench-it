@@ -17,10 +17,15 @@ public interface StoreRepository extends JpaRepository<Store, UUID> {
 
     List<Store> findByGooglePlaceIdIn(List<String> googlePlaceIds);
 
+    Optional<Store> findByIdAndApprovalStatus(UUID id, String approvalStatus);
+
+    Optional<Store> findByGooglePlaceIdAndApprovalStatus(String googlePlaceId, String approvalStatus);
+
     @Query(value = """
             select *
             from stores
-            where (search_vector @@ plainto_tsquery('english', :query)
+            where coalesce(approval_status, 'APPROVED') = 'APPROVED'
+              and (search_vector @@ plainto_tsquery('english', :query)
                    or similarity(name, :query) > :minSimilarity)
               and (:minRating is null or rating >= :minRating)
               and (:servicesContains is null or services_text ilike concat('%', :servicesContains, '%'))
@@ -62,7 +67,8 @@ public interface StoreRepository extends JpaRepository<Store, UUID> {
     @Query(value = """
             select count(*)
             from stores
-            where (search_vector @@ plainto_tsquery('english', :query)
+            where coalesce(approval_status, 'APPROVED') = 'APPROVED'
+              and (search_vector @@ plainto_tsquery('english', :query)
                    or similarity(name, :query) > :minSimilarity)
               and (:minRating is null or rating >= :minRating)
               and (:servicesContains is null or services_text ilike concat('%', :servicesContains, '%'))
@@ -99,7 +105,8 @@ public interface StoreRepository extends JpaRepository<Store, UUID> {
     @Query(value = """
             select *
             from stores
-            where lat is not null and lng is not null
+            where coalesce(approval_status, 'APPROVED') = 'APPROVED'
+              and lat is not null and lng is not null
               and (:minRating is null or rating >= :minRating)
               and (:servicesContains is null or services_text ilike concat('%', :servicesContains, '%'))
               and (:city is null or lower(city) = lower(:city))
@@ -151,7 +158,8 @@ public interface StoreRepository extends JpaRepository<Store, UUID> {
     @Query(value = """
             select count(*)
             from stores
-            where lat is not null and lng is not null
+            where coalesce(approval_status, 'APPROVED') = 'APPROVED'
+              and lat is not null and lng is not null
               and (:minRating is null or rating >= :minRating)
               and (:servicesContains is null or services_text ilike concat('%', :servicesContains, '%'))
               and (:city is null or lower(city) = lower(:city))
@@ -194,7 +202,8 @@ public interface StoreRepository extends JpaRepository<Store, UUID> {
     @Query(value = """
             select *
             from stores
-            where lat is not null and lng is not null
+            where coalesce(approval_status, 'APPROVED') = 'APPROVED'
+              and lat is not null and lng is not null
               and (search_vector @@ plainto_tsquery('english', :query)
                    or similarity(name, :query) > :minSimilarity)
               and (:minRating is null or rating >= :minRating)
@@ -246,7 +255,8 @@ public interface StoreRepository extends JpaRepository<Store, UUID> {
     @Query(value = """
             select count(*)
             from stores
-            where lat is not null and lng is not null
+            where coalesce(approval_status, 'APPROVED') = 'APPROVED'
+              and lat is not null and lng is not null
               and (search_vector @@ plainto_tsquery('english', :query)
                    or similarity(name, :query) > :minSimilarity)
               and (:minRating is null or rating >= :minRating)
@@ -293,7 +303,8 @@ public interface StoreRepository extends JpaRepository<Store, UUID> {
     @Query("""
             select s
             from Store s
-            where (:minRating is null or s.rating >= :minRating)
+            where s.approvalStatus = 'APPROVED'
+              and (:minRating is null or s.rating >= :minRating)
               and (
                 :servicesContains is null
                 or lower(coalesce(s.servicesText, '')) like concat('%', lower(cast(:servicesContains as string)), '%')
@@ -322,7 +333,8 @@ public interface StoreRepository extends JpaRepository<Store, UUID> {
     @Query("""
             select s
             from Store s
-            where (:minRating is null or s.rating >= :minRating)
+            where s.approvalStatus = 'APPROVED'
+              and (:minRating is null or s.rating >= :minRating)
               and (
                 :servicesContains is null
                 or lower(coalesce(s.servicesText, '')) like concat('%', lower(cast(:servicesContains as string)), '%')

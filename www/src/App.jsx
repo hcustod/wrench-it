@@ -9,6 +9,7 @@ import UserRegistrationPage from './pages/UserRegistrationPage.jsx';
 import MechanicOwnerRegistrationPage from './pages/MechanicOwnerRegistrationPage.jsx';
 import UserDashboardPage from './pages/UserDashboardPage.jsx';
 import WriteReviewPage from './pages/WriteReviewPage.jsx';
+import RequestWorkOrderPage from './pages/RequestWorkOrderPage.jsx';
 import ReviewVerificationPage from './pages/ReviewVerificationPage.jsx';
 import MechanicDashboardPage from './pages/MechanicDashboardPage.jsx';
 import ShopOwnerDashboardPage from './pages/ShopOwnerDashboardPage.jsx';
@@ -155,6 +156,16 @@ export default function App() {
             <ProtectedRoute>
               <Layout>
                 <WriteReviewPage />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/request-work-order"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <RequestWorkOrderPage />
               </Layout>
             </ProtectedRoute>
           }

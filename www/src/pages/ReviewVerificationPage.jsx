@@ -14,9 +14,9 @@ import {
 } from '../api/mechanic.js';
 
 function decisionMessage(result) {
-  if (result === 'APPROVED') return 'Review approved.';
+  if (result === 'APPROVED') return 'Verification approved.';
   if (result === 'NEEDS_INFO') return 'Requested more information from customer.';
-  if (result === 'REJECTED') return 'Review rejected.';
+  if (result === 'REJECTED') return 'Verification rejected.';
   return 'Decision saved.';
 }
 
@@ -135,7 +135,7 @@ export default function ReviewVerificationPage() {
   if (loading && !review) {
     return (
       <section className="mb-4">
-        <h1 className="mb-1">Review Verification</h1>
+        <h1 className="mb-1">Receipt Verification</h1>
         <p className="wt-text-muted mb-0">Loading verification details...</p>
       </section>
     );
@@ -144,8 +144,8 @@ export default function ReviewVerificationPage() {
   if (!review) {
     return (
       <section className="mb-4">
-        <h1 className="mb-1">Review Verification</h1>
-        <p className="wt-text-muted mb-0">{error || 'Review verification details not found.'}</p>
+        <h1 className="mb-1">Receipt Verification</h1>
+        <p className="wt-text-muted mb-0">{error || 'Receipt verification details not found.'}</p>
       </section>
     );
   }
@@ -153,9 +153,9 @@ export default function ReviewVerificationPage() {
   return (
     <>
       <section className="mb-4">
-        <h1 className="mb-1">Review Verification</h1>
+        <h1 className="mb-1">Receipt Verification</h1>
         <p className="wt-text-muted mb-0">
-          Verify the authenticity of this customer review.
+          Review the receipt evidence attached to this customer review.
         </p>
       </section>
 

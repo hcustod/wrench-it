@@ -45,14 +45,16 @@ public class ReviewService {
                                     UUID userId,
                                     UUID serviceId,
                                     UUID receiptId,
+                                    UUID workOrderId,
                                     int rating,
                                     String comment) {
-        StoreReview review = storeReviewRepository.findByStoreIdAndUserId(storeId, userId)
+        StoreReview review = storeReviewRepository.findByWorkOrderId(workOrderId)
                 .orElseGet(StoreReview::new);
         review.setStoreId(storeId);
         review.setUserId(userId);
         review.setServiceId(serviceId);
         review.setReceiptId(receiptId);
+        review.setWorkOrderId(workOrderId);
         review.setRating(rating);
         review.setComment(comment);
         return storeReviewRepository.save(review);

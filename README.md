@@ -5,14 +5,14 @@ WrenchIt is an auto service finder application.
 Our goal is to connect users to desired auto service stores more easily. 
 
 Users can register, search and compare repair shops, view shop details, save shops, and manage portal workflows through a single web application.
-User can review stores, and upload reciepts of services for verification. 
+User can request work orders, review completed visits, and upload reciepts of services for verification. 
 
 Store owners can create a profile then manage store listings by provide details such as services offered, location, and phone. 
-We are excited to implement a full booking system in future releases. 
+Store owners can now manage live work orders, while admins separately moderate receipt verification and shop onboarding approval. 
 
 ## Tools and Tech
 - Frontend: React + Vite, served by Caddy
-- Backend: Java 21, Spring Boot (modular services in `services/*`)
+- Backend: Java 21, Spring Boot single API in `services/api` with supporting `stores` and `engagement` modules
 - Data: PostgreSQL
 - Auth: Keycloak (JWT/OIDC)
 - Deployment: Docker
@@ -23,7 +23,6 @@ We are excited to implement a full booking system in future releases.
 - A local `.env` file (copied from `.env.example`)
 
 Required values in `.env`:
-- `POSTGRES_AUTH_PASSWORD`
 - `POSTGRES_APP_PASSWORD`
 - `POSTGRES_KC_PASSWORD`
 - `KEYCLOAK_ADMIN_PASSWORD`
@@ -45,7 +44,6 @@ Key env vars:
 - `POSTGRES_APP_DB` (default `wrenchit_app`)
 - `POSTGRES_APP_USER` (default `wrenchit_app_user`)
 - `POSTGRES_APP_PASSWORD` (required)
-- `POSTGRES_AUTH_PASSWORD` (required for compose)
 - `POSTGRES_KC_PASSWORD` (required for compose)
 - `KEYCLOAK_ADMIN_PASSWORD` (required for compose)
 - `KEYCLOAK_DEMO_USER_PASSWORD` (required for realm import)

@@ -1,22 +1,37 @@
-import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { LuStar, LuUpload, LuInfo } from 'react-icons/lu';
 import { createReceipt } from '../api/receipts.js';
 import { submitReview } from '../api/reviews.js';
-import { getStore, listStoreServices } from '../api/stores.js';
+import { getStore } from '../api/stores.js';
+import { listReviewableWorkOrders } from '../api/workOrders.js';
+
+function formatDateTime(value) {
+  if (!value) return 'Unknown visit time';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
 
 export default function WriteReviewPage() {
   const [searchParams] = useSearchParams();
   const storeId = searchParams.get('storeId') || searchParams.get('shopId') || '';
+  const preselectedWorkOrderId = searchParams.get('workOrderId') || '';
 
   const [shop, setShop] = useState(null);
-  const [services, setServices] = useState([]);
+  const [workOrders, setWorkOrders] = useState([]);
+  const [selectedWorkOrderId, setSelectedWorkOrderId] = useState('');
   const [loadingContext, setLoadingContext] = useState(false);
   const [contextError, setContextError] = useState('');
 
   const [rating, setRating] = useState(0);
   const [hoverRating, setHoverRating] = useState(0);
-  const [serviceId, setServiceId] = useState('');
   const [reviewText, setReviewText] = useState('');
   const [receiptFile, setReceiptFile] = useState(null);
   const [fileName, setFileName] = useState('');
@@ -28,29 +43,30 @@ export default function WriteReviewPage() {
     let cancelled = false;
 
     async function loadContext() {
-      if (!storeId) {
-        setShop(null);
-        setServices([]);
-        setContextError('');
-        return;
-      }
-
       setLoadingContext(true);
       setContextError('');
       try {
-        const [storeRes, servicesRes] = await Promise.all([
-          getStore(storeId),
-          listStoreServices(storeId),
+        const [storeRes, reviewableWorkOrders] = await Promise.all([
+          storeId ? getStore(storeId) : Promise.resolve(null),
+          listReviewableWorkOrders(storeId || undefined),
         ]);
         if (cancelled) return;
+
         setShop(storeRes);
-        setServices(servicesRes ?? []);
+        setWorkOrders(reviewableWorkOrders ?? []);
+
+        const nextSelected =
+          (reviewableWorkOrders ?? []).find((item) => item.id === preselectedWorkOrderId)?.id
+          || reviewableWorkOrders?.[0]?.id
+          || '';
+        setSelectedWorkOrderId(nextSelected);
       } catch (err) {
         if (cancelled) return;
         setShop(null);
-        setServices([]);
+        setWorkOrders([]);
+        setSelectedWorkOrderId('');
         setContextError(
-          err instanceof Error ? err.message : 'Failed to load shop or service data.',
+          err instanceof Error ? err.message : 'Failed to load completed work orders.',
         );
       } finally {
         if (!cancelled) setLoadingContext(false);
@@ -62,30 +78,30 @@ export default function WriteReviewPage() {
     return () => {
       cancelled = true;
     };
-  }, [storeId]);
+  }, [storeId, preselectedWorkOrderId]);
 
-  function handleFileChange(e) {
-    const file = e.target.files?.[0] ?? null;
+  const selectedWorkOrder = useMemo(
+    () => workOrders.find((item) => item.id === selectedWorkOrderId) ?? null,
+    [workOrders, selectedWorkOrderId],
+  );
+
+  function handleFileChange(event) {
+    const file = event.target.files?.[0] ?? null;
     setReceiptFile(file);
     setFileName(file ? file.name : '');
   }
 
-  async function handleSubmit(e) {
-    e.preventDefault();
+  async function handleSubmit(event) {
+    event.preventDefault();
     setError('');
     setSuccess('');
 
-    if (!storeId) {
-      setError('Select a shop before submitting a review.');
+    if (!selectedWorkOrder) {
+      setError('Select a completed work order before submitting a review.');
       return;
     }
-
     if (!rating || !reviewText.trim()) {
       setError('Rating and review text are required.');
-      return;
-    }
-    if (!serviceId) {
-      setError('Service performed is required.');
       return;
     }
 
@@ -97,20 +113,29 @@ export default function WriteReviewPage() {
       if (receiptFile) {
         const receipt = await createReceipt({
           file: receiptFile,
-          storeId,
+          storeId: selectedWorkOrder.storeId,
           currency: 'USD',
         });
         receiptId = receipt?.id;
       }
 
-      await submitReview(storeId, {
+      await submitReview(selectedWorkOrder.storeId, {
         rating,
         comment: reviewText.trim(),
-        serviceId: serviceId || undefined,
+        serviceId: selectedWorkOrder.serviceId,
+        workOrderId: selectedWorkOrder.id,
         receiptId,
       });
 
+      const remainingWorkOrders = workOrders.filter((item) => item.id !== selectedWorkOrder.id);
       setSuccess('Review submitted for verification.');
+      setRating(0);
+      setHoverRating(0);
+      setReviewText('');
+      setReceiptFile(null);
+      setFileName('');
+      setWorkOrders(remainingWorkOrders);
+      setSelectedWorkOrderId(remainingWorkOrders[0]?.id ?? '');
     } catch (err) {
       if (err && typeof err === 'object' && 'status' in err && err.status === 401) {
         setError('You need to be logged in to submit a review.');
@@ -124,19 +149,23 @@ export default function WriteReviewPage() {
     }
   }
 
-  const displayShopName = shop?.name ?? (storeId ? 'Loading shop...' : 'Select a shop from search');
+  const displayShopName = selectedWorkOrder?.shopName
+    ?? shop?.name
+    ?? (storeId ? 'Loading shop...' : 'Select a completed visit');
 
   return (
     <>
       <section className="mb-4">
         <h1 className="mb-1">Write a Review</h1>
-        <p className="wt-text-muted mb-0">Share your experience to help others.</p>
+        <p className="wt-text-muted mb-0">
+          Reviews are now tied to completed work orders so each visit can have its own feedback.
+        </p>
       </section>
 
       <section>
         <div className="wt-card" style={{ maxWidth: '720px', margin: '0 auto' }}>
           {loadingContext && (
-            <div className="small mb-3 wt-text-muted">Loading shop data...</div>
+            <div className="small mb-3 wt-text-muted">Loading completed work orders...</div>
           )}
           {contextError && (
             <div className="small mb-3" style={{ color: '#FF8C42' }}>
@@ -154,6 +183,34 @@ export default function WriteReviewPage() {
             </div>
           )}
 
+          {!loadingContext && workOrders.length === 0 && (
+            <div
+              className="rounded-4 p-3 mb-3"
+              style={{
+                backgroundColor: '#2A2740',
+                border: '1px solid #3A3652',
+              }}
+            >
+              <div className="text-white mb-1">No completed work orders are ready for review.</div>
+              <div className="wt-text-muted small">
+                Complete a work order first, then come back here to leave visit-based feedback.
+              </div>
+              <div className="d-flex gap-2 mt-3">
+                <Link to="/dashboard" className="btn btn-sm btn-wt-primary">
+                  Open Dashboard
+                </Link>
+                {storeId && (
+                  <Link
+                    to={`/request-work-order?storeId=${storeId}`}
+                    className="btn btn-sm btn-wt-outline"
+                  >
+                    Request Work Order
+                  </Link>
+                )}
+              </div>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="d-flex flex-column gap-3">
             <div>
               <label className="form-label text-white small mb-1">Shop Name</label>
@@ -164,6 +221,39 @@ export default function WriteReviewPage() {
                 value={displayShopName}
               />
             </div>
+
+            <div>
+              <label className="form-label text-white small mb-1">Completed Visit *</label>
+              <select
+                className="form-select wt-input"
+                value={selectedWorkOrderId}
+                onChange={(event) => setSelectedWorkOrderId(event.target.value)}
+                disabled={loadingContext || workOrders.length === 0}
+              >
+                <option value="">Select a completed visit</option>
+                {workOrders.map((workOrder) => (
+                  <option key={workOrder.id} value={workOrder.id}>
+                    {workOrder.shopName} - {workOrder.service} - {formatDateTime(workOrder.completedAt || workOrder.scheduledFor)}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="form-label text-white small mb-1">Service</label>
+              <input
+                type="text"
+                readOnly
+                className="form-control wt-input"
+                value={selectedWorkOrder?.service ?? 'Select a completed visit first'}
+              />
+            </div>
+
+            {selectedWorkOrder?.vehicleLabel && (
+              <div className="small wt-text-muted">
+                Vehicle: {selectedWorkOrder.vehicleLabel}
+              </div>
+            )}
 
             <div>
               <label className="form-label text-white small mb-1">Your Rating *</label>
@@ -195,23 +285,6 @@ export default function WriteReviewPage() {
             </div>
 
             <div>
-              <label className="form-label text-white small mb-1">Service Performed *</label>
-              <select
-                className="form-select wt-input"
-                value={serviceId}
-                onChange={(e) => setServiceId(e.target.value)}
-                disabled={!storeId || loadingContext}
-              >
-                <option value="">Select a service</option>
-                {services.map((svc) => (
-                  <option key={svc.id} value={svc.id}>
-                    {svc.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
               <label className="form-label text-white small mb-1">Your Review *</label>
               <textarea
                 className="form-control"
@@ -224,9 +297,9 @@ export default function WriteReviewPage() {
                   fontSize: '0.95rem',
                   resize: 'none',
                 }}
-                placeholder="Tell us about your experience..."
+                placeholder="Tell us about this completed visit..."
                 value={reviewText}
-                onChange={(e) => setReviewText(e.target.value)}
+                onChange={(event) => setReviewText(event.target.value)}
               />
             </div>
 
@@ -258,58 +331,40 @@ export default function WriteReviewPage() {
                   {fileName ? (
                     <>
                       <span className="text-white">{fileName}</span>
-                      <span className="wt-text-muted small">Click to change file</span>
+                      <span className="small wt-text-muted mt-1">Click to replace file</span>
                     </>
                   ) : (
                     <>
-                      <span className="wt-text-muted">
-                        Click to upload receipt (PDF or image, max 10MB)
+                      <span className="text-white">Click to upload receipt</span>
+                      <span className="small wt-text-muted mt-1">
+                        JPG, PNG, or PDF accepted
                       </span>
                     </>
                   )}
                 </label>
               </div>
+            </div>
 
-              <div
-                className="d-flex gap-2 align-items-start mt-3 rounded-4 p-3 small"
-                style={{
-                  backgroundColor: 'rgba(255,140,66,0.1)',
-                  border: '1px solid rgba(255,140,66,0.3)',
-                }}
-              >
-                <LuInfo size={18} style={{ color: '#FF8C42', marginTop: 2 }} />
-                <p className="wt-text-muted mb-0">
-                  Uploaded receipts will be reviewed by a certified mechanic to help verify
-                  your review and maintain trust in the community.
-                </p>
+            <div
+              className="rounded-4 p-3 d-flex gap-2 align-items-start"
+              style={{
+                backgroundColor: 'rgba(59,130,246,0.12)',
+                border: '1px solid rgba(59,130,246,0.35)',
+              }}
+            >
+              <LuInfo size={18} style={{ color: '#60a5fa', flexShrink: 0, marginTop: 2 }} />
+              <div className="small wt-text-muted">
+                Uploaded receipts will be reviewed by a certified mechanic to help verify that this completed visit really happened.
               </div>
             </div>
 
-            <div className="d-flex flex-column flex-md-row gap-2 pt-2">
-              <button
-                type="submit"
-                className="btn btn-wt-primary flex-grow-1"
-                disabled={!rating || !serviceId || !reviewText.trim() || !storeId || submitting}
-              >
-                {submitting ? 'Submitting...' : 'Submit Review'}
-              </button>
-              <button
-                type="button"
-                className="btn btn-wt-outline"
-                onClick={() => {
-                  setRating(0);
-                  setHoverRating(0);
-                  setServiceId('');
-                  setReviewText('');
-                  setReceiptFile(null);
-                  setFileName('');
-                  setError('');
-                  setSuccess('');
-                }}
-              >
-                Clear
-              </button>
-            </div>
+            <button
+              type="submit"
+              className="btn btn-wt-primary mt-2"
+              disabled={submitting || !selectedWorkOrder}
+            >
+              {submitting ? 'Submitting...' : 'Submit Review'}
+            </button>
           </form>
         </div>
       </section>

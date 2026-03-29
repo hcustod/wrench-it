@@ -13,6 +13,7 @@ import { getMechanicDashboard } from '../api/mechanic.js';
 const EMPTY_STATS = {
   totalVerified: 0,
   thisWeek: 0,
+  pendingVerifications: 0,
   pendingReviews: 0,
   reputation: 0,
 };
@@ -66,7 +67,7 @@ export default function MechanicDashboardPage() {
           </div>
         </div>
         <p className="wt-text-muted mb-0">
-          Review and verify customer reviews to keep the community trusted.
+          Review receipt evidence attached to customer reviews to keep the platform trustworthy.
         </p>
         {error && (
           <p className="small mt-2 mb-0" style={{ color: '#FF8C42' }}>
@@ -97,8 +98,8 @@ export default function MechanicDashboardPage() {
           <div className="col-12 col-sm-6 col-lg-3">
             <StatsCard
               icon={LuClock}
-              label="Pending Reviews"
-              value={stats.pendingReviews ?? 0}
+              label="Pending Verifications"
+              value={stats.pendingVerifications ?? stats.pendingReviews ?? 0}
               tone="default"
             />
           </div>
@@ -120,7 +121,7 @@ export default function MechanicDashboardPage() {
             <div>
               <h2 className="h5 text-white mb-1">Pending Verifications</h2>
               <p className="wt-text-muted mb-0 small">
-                {pendingVerifications.length} review
+                {pendingVerifications.length} verification
                 {pendingVerifications.length === 1 ? '' : 's'} waiting for your decision.
               </p>
             </div>
@@ -168,7 +169,7 @@ export default function MechanicDashboardPage() {
                       className="btn btn-wt-primary d-flex align-items-center gap-2"
                     >
                       <LuFileText size={16} />
-                      <span>Review</span>
+                      <span>Open Case</span>
                     </Link>
                   </div>
                 </div>

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { LuStar, LuClock, LuCalendar, LuHeart } from 'react-icons/lu';
+import { LuStar, LuClock, LuCalendar, LuHeart, LuWrench } from 'react-icons/lu';
 import StatusBadge from '../components/common/StatusBadge.jsx';
 import { listSavedShops, unsaveShop } from '../api/saved.js';
 import { getMyDashboard } from '../api/user.js';
@@ -26,11 +26,17 @@ function formatTime(value) {
   });
 }
 
-export default function UserDashboardPage() {
-  const [activeTab, setActiveTab] = useState('reviews');
+function isClosedStatus(status) {
+  const normalized = typeof status === 'string' ? status.toUpperCase() : '';
+  return normalized === 'COMPLETED' || normalized === 'DECLINED' || normalized === 'CANCELED';
+}
 
+export default function UserDashboardPage() {
+  const [activeTab, setActiveTab] = useState('workOrders');
+
+  const [workOrders, setWorkOrders] = useState([]);
   const [reviews, setReviews] = useState([]);
-  const [bookings, setBookings] = useState([]);
+  const [receiptSubmissions, setReceiptSubmissions] = useState([]);
   const [savedShops, setSavedShops] = useState([]);
   const [removingSavedId, setRemovingSavedId] = useState(null);
 
@@ -45,34 +51,51 @@ export default function UserDashboardPage() {
         const response = await getMyDashboard();
         if (cancelled) return;
 
-        const reviewItems = (response?.reviews ?? []).map((item) => ({
+        const workOrderItems = (response?.workOrders ?? response?.bookings ?? []).map((item) => ({
           id: item.id,
           storeId: item.storeId,
           shopName: item.shopName,
           service: item.service,
+          date: formatDate(item.scheduledFor || item.date),
+          time: formatTime(item.scheduledFor || item.time || item.date),
+          status: item.status ?? 'REQUESTED',
+          vehicleLabel: item.vehicleLabel ?? '',
+          customerNotes: item.customerNotes ?? '',
+          ownerNotes: item.ownerNotes ?? '',
+          canReview: Boolean(item.canReview),
+        }));
+
+        const reviewItems = (response?.reviews ?? []).map((item) => ({
+          id: item.id,
+          storeId: item.storeId,
+          workOrderId: item.workOrderId,
+          shopName: item.shopName,
+          service: item.service,
           date: formatDate(item.date),
-          status: item.status === 'verified' ? 'verified' : 'pending',
+          status: item.status ?? 'published',
           rating: Number(item.rating ?? 0),
           reviewText: item.reviewText ?? '',
         }));
 
-        const bookingItems = (response?.bookings ?? []).map((item) => ({
+        const submissionItems = (response?.receiptSubmissions ?? []).map((item) => ({
           id: item.id,
           storeId: item.storeId,
           shopName: item.shopName,
           service: item.service,
           date: formatDate(item.date),
           time: formatTime(item.time || item.date),
-          status: item.status === 'upcoming' ? 'upcoming' : 'completed',
+          status: item.status ?? 'pending',
         }));
 
+        setWorkOrders(workOrderItems);
         setReviews(reviewItems);
-        setBookings(bookingItems);
+        setReceiptSubmissions(submissionItems);
         setDashboardError('');
       } catch (err) {
         if (cancelled) return;
+        setWorkOrders([]);
         setReviews([]);
-        setBookings([]);
+        setReceiptSubmissions([]);
         setDashboardError(
           err instanceof Error ? err.message : 'Failed to load your dashboard data.',
         );
@@ -117,13 +140,21 @@ export default function UserDashboardPage() {
     };
   }, []);
 
-  const upcomingBookings = useMemo(
-    () => bookings.filter((b) => b.status === 'upcoming'),
-    [bookings],
+  const activeWorkOrders = useMemo(
+    () => workOrders.filter((item) => !isClosedStatus(item.status)),
+    [workOrders],
   );
-  const pastBookings = useMemo(
-    () => bookings.filter((b) => b.status === 'completed'),
-    [bookings],
+  const closedWorkOrders = useMemo(
+    () => workOrders.filter((item) => isClosedStatus(item.status)),
+    [workOrders],
+  );
+  const pendingReceiptSubmissions = useMemo(
+    () => receiptSubmissions.filter((item) => item.status === 'pending'),
+    [receiptSubmissions],
+  );
+  const reviewedReceiptSubmissions = useMemo(
+    () => receiptSubmissions.filter((item) => item.status !== 'pending'),
+    [receiptSubmissions],
   );
 
   async function handleUnsave(storeId) {
@@ -141,24 +172,23 @@ export default function UserDashboardPage() {
 
   return (
     <>
-      
       <section className="mb-4">
         <h1 className="mb-1">My Dashboard</h1>
         <p className="wt-text-muted mb-0">
-          Manage your reviews, bookings, and saved shops.
+          Track work orders, visit-based reviews, receipt submissions, and saved shops.
         </p>
       </section>
 
-      
       <section>
         <div className="wt-card p-0">
           <div
-            className="d-flex"
+            className="d-flex flex-wrap"
             style={{ borderBottom: '1px solid #3A3652' }}
           >
             {[
+              { id: 'workOrders', label: 'Work Orders' },
               { id: 'reviews', label: 'My Reviews' },
-              { id: 'bookings', label: 'My Bookings' },
+              { id: 'receipts', label: 'Receipt Submissions' },
               { id: 'saved', label: 'Saved Shops' },
             ].map((tab) => {
               const isActive = activeTab === tab.id;
@@ -181,6 +211,153 @@ export default function UserDashboardPage() {
           </div>
 
           <div className="p-4 p-md-5">
+            {activeTab === 'workOrders' && (
+              <div className="d-flex flex-column gap-4">
+                {dashboardError && (
+                  <p className="small" style={{ color: '#FF8C42' }}>
+                    {dashboardError}
+                  </p>
+                )}
+
+                <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
+                  <div>
+                    <h3 className="h5 text-white mb-1">Your Work Orders</h3>
+                    <p className="wt-text-muted small mb-0">
+                      These move from requested to completed, then unlock review submission.
+                    </p>
+                  </div>
+                  <Link to="/search" className="btn btn-sm btn-wt-primary">
+                    Find a Shop
+                  </Link>
+                </div>
+
+                <div>
+                  <h4 className="h6 text-white mb-3">Active Requests</h4>
+                  <div className="d-flex flex-column gap-3">
+                    {activeWorkOrders.map((item) => (
+                      <div
+                        key={item.id}
+                        className="rounded-4 p-3 p-md-4"
+                        style={{
+                          backgroundColor: '#2A2740',
+                          border: '1px solid #3A3652',
+                        }}
+                      >
+                        <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-start gap-3">
+                          <div>
+                            <div className="d-flex flex-wrap align-items-center gap-2 mb-1">
+                              <h5 className="h6 text-white mb-0">{item.shopName}</h5>
+                              <StatusBadge status={item.status} />
+                            </div>
+                            <p className="wt-text-muted mb-2">{item.service}</p>
+                            <div className="d-flex flex-wrap align-items-center gap-3 small wt-text-muted">
+                              <div className="d-flex align-items-center gap-1">
+                                <LuCalendar size={14} />
+                                <span>{item.date}</span>
+                              </div>
+                              <div className="d-flex align-items-center gap-1">
+                                <LuClock size={14} />
+                                <span>{item.time}</span>
+                              </div>
+                              {item.vehicleLabel && (
+                                <div className="d-flex align-items-center gap-1">
+                                  <LuWrench size={14} />
+                                  <span>{item.vehicleLabel}</span>
+                                </div>
+                              )}
+                            </div>
+                            {item.customerNotes && (
+                              <p className="wt-text-muted small mb-0 mt-2">
+                                Your notes: {item.customerNotes}
+                              </p>
+                            )}
+                            {item.ownerNotes && (
+                              <p className="wt-text-muted small mb-0 mt-2">
+                                Shop notes: {item.ownerNotes}
+                              </p>
+                            )}
+                          </div>
+                          <Link
+                            to={`/shop/${item.storeId}`}
+                            className="btn btn-sm btn-wt-outline"
+                          >
+                            Open Shop
+                          </Link>
+                        </div>
+                      </div>
+                    ))}
+                    {activeWorkOrders.length === 0 && (
+                      <p className="wt-text-muted small mb-0">
+                        No active work orders yet.
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="h6 text-white mb-3">Closed Work Orders</h4>
+                  <div className="d-flex flex-column gap-3">
+                    {closedWorkOrders.map((item) => (
+                      <div
+                        key={item.id}
+                        className="rounded-4 p-3 p-md-4"
+                        style={{
+                          backgroundColor: '#2A2740',
+                          border: '1px solid #3A3652',
+                        }}
+                      >
+                        <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-start gap-3">
+                          <div>
+                            <div className="d-flex flex-wrap align-items-center gap-2 mb-1">
+                              <h5 className="h6 text-white mb-0">{item.shopName}</h5>
+                              <StatusBadge status={item.status} />
+                            </div>
+                            <p className="wt-text-muted mb-2">{item.service}</p>
+                            <div className="d-flex flex-wrap align-items-center gap-3 small wt-text-muted">
+                              <div className="d-flex align-items-center gap-1">
+                                <LuCalendar size={14} />
+                                <span>{item.date}</span>
+                              </div>
+                              <div className="d-flex align-items-center gap-1">
+                                <LuClock size={14} />
+                                <span>{item.time}</span>
+                              </div>
+                            </div>
+                            {item.ownerNotes && (
+                              <p className="wt-text-muted small mb-0 mt-2">
+                                Shop notes: {item.ownerNotes}
+                              </p>
+                            )}
+                          </div>
+                          <div className="d-flex flex-column gap-2">
+                            <Link
+                              to={`/shop/${item.storeId}`}
+                              className="btn btn-sm btn-wt-outline"
+                            >
+                              Open Shop
+                            </Link>
+                            {item.canReview && (
+                              <Link
+                                to={`/write-review?storeId=${item.storeId}&workOrderId=${item.id}`}
+                                className="btn btn-sm btn-wt-primary"
+                              >
+                                Write Review
+                              </Link>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    {closedWorkOrders.length === 0 && (
+                      <p className="wt-text-muted small mb-0">
+                        No completed or closed work orders yet.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {activeTab === 'reviews' && (
               <div className="d-flex flex-column gap-3">
                 {dashboardError && (
@@ -192,11 +369,8 @@ export default function UserDashboardPage() {
                   <h3 className="h5 text-white mb-0">
                     Your Reviews ({reviews.length})
                   </h3>
-                  <Link
-                    to="/write-review"
-                    className="btn btn-wt-primary btn-sm"
-                  >
-                    Write New Review
+                  <Link to="/write-review" className="btn btn-wt-primary btn-sm">
+                    Review Completed Visit
                   </Link>
                 </div>
 
@@ -240,28 +414,27 @@ export default function UserDashboardPage() {
                 ))}
                 {reviews.length === 0 && (
                   <p className="wt-text-muted small mb-0">
-                    You haven&apos;t submitted any reviews yet.
+                    You haven&apos;t submitted any visit-based reviews yet.
                   </p>
                 )}
               </div>
             )}
 
-            {activeTab === 'bookings' && (
+            {activeTab === 'receipts' && (
               <div className="d-flex flex-column gap-4">
                 {dashboardError && (
                   <p className="small" style={{ color: '#FF8C42' }}>
                     {dashboardError}
                   </p>
                 )}
-                <h3 className="h5 text-white mb-1">Your Bookings</h3>
+                <h3 className="h5 text-white mb-1">Your Receipt Submissions</h3>
 
-                
                 <div>
-                  <h4 className="h6 text-white mb-3">Upcoming</h4>
+                  <h4 className="h6 text-white mb-3">Awaiting Review</h4>
                   <div className="d-flex flex-column gap-3">
-                    {upcomingBookings.map((b) => (
+                    {pendingReceiptSubmissions.map((item) => (
                       <div
-                        key={b.id}
+                        key={item.id}
                         className="rounded-4 p-3 p-md-4"
                         style={{
                           backgroundColor: '#2A2740',
@@ -270,45 +443,42 @@ export default function UserDashboardPage() {
                       >
                         <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-start gap-3">
                           <div>
-                            <h5 className="h6 text-white mb-1">{b.shopName}</h5>
-                            <p className="wt-text-muted mb-2">{b.service}</p>
+                            <div className="d-flex flex-wrap align-items-center gap-2 mb-1">
+                              <h5 className="h6 text-white mb-0">{item.shopName}</h5>
+                              <StatusBadge status={item.status} />
+                            </div>
+                            <p className="wt-text-muted mb-2">{item.service}</p>
                             <div className="d-flex flex-wrap align-items-center gap-3 small wt-text-muted">
                               <div className="d-flex align-items-center gap-1">
                                 <LuCalendar size={14} />
-                                <span>{b.date}</span>
+                                <span>{item.date}</span>
                               </div>
                               <div className="d-flex align-items-center gap-1">
                                 <LuClock size={14} />
-                                <span>{b.time}</span>
+                                <span>{item.time}</span>
                               </div>
                             </div>
-                          </div>
-                          <div className="d-flex gap-2">
-                            <button className="btn btn-sm btn-wt-primary">
-                              View Details
-                            </button>
-                            <button className="btn btn-sm btn-wt-outline">
-                              Cancel
-                            </button>
+                            <p className="wt-text-muted small mb-0 mt-2">
+                              Your receipt has been submitted and is waiting for review.
+                            </p>
                           </div>
                         </div>
                       </div>
                     ))}
-                    {upcomingBookings.length === 0 && (
+                    {pendingReceiptSubmissions.length === 0 && (
                       <p className="wt-text-muted small mb-0">
-                        No upcoming bookings.
+                        No receipts are waiting for review.
                       </p>
                     )}
                   </div>
                 </div>
 
-                
                 <div>
-                  <h4 className="h6 text-white mb-3">Past Bookings</h4>
+                  <h4 className="h6 text-white mb-3">Reviewed</h4>
                   <div className="d-flex flex-column gap-3">
-                    {pastBookings.map((b) => (
+                    {reviewedReceiptSubmissions.map((item) => (
                       <div
-                        key={b.id}
+                        key={item.id}
                         className="rounded-4 p-3 p-md-4"
                         style={{
                           backgroundColor: '#2A2740',
@@ -317,31 +487,28 @@ export default function UserDashboardPage() {
                       >
                         <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-start gap-3">
                           <div>
-                            <h5 className="h6 text-white mb-1">{b.shopName}</h5>
-                            <p className="wt-text-muted mb-2">{b.service}</p>
+                            <div className="d-flex flex-wrap align-items-center gap-2 mb-1">
+                              <h5 className="h6 text-white mb-0">{item.shopName}</h5>
+                              <StatusBadge status={item.status} />
+                            </div>
+                            <p className="wt-text-muted mb-2">{item.service}</p>
                             <div className="d-flex flex-wrap align-items-center gap-3 small wt-text-muted">
                               <div className="d-flex align-items-center gap-1">
                                 <LuCalendar size={14} />
-                                <span>{b.date}</span>
+                                <span>{item.date}</span>
                               </div>
                               <div className="d-flex align-items-center gap-1">
                                 <LuClock size={14} />
-                                <span>{b.time}</span>
+                                <span>{item.time}</span>
                               </div>
                             </div>
                           </div>
-                          <Link
-                            to={b.storeId ? `/write-review?storeId=${b.storeId}` : '/write-review'}
-                            className="btn btn-sm btn-wt-primary"
-                          >
-                            Write Review
-                          </Link>
                         </div>
                       </div>
                     ))}
-                    {pastBookings.length === 0 && (
+                    {reviewedReceiptSubmissions.length === 0 && (
                       <p className="wt-text-muted small mb-0">
-                        No completed bookings yet.
+                        No reviewed receipts yet.
                       </p>
                     )}
                   </div>
@@ -384,10 +551,7 @@ export default function UserDashboardPage() {
                       </div>
                     </div>
                     <div className="d-flex align-items-center gap-2">
-                      <Link
-                        to={`/shop/${shop.id}`}
-                        className="btn btn-sm btn-wt-primary"
-                      >
+                      <Link to={`/shop/${shop.id}`} className="btn btn-sm btn-wt-primary">
                         View Shop
                       </Link>
                       <button

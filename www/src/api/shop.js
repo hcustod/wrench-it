@@ -52,6 +52,23 @@ export function getMyShopReviews() {
   return apiFetch('/shop/me/reviews');
 }
 
+export function getMyShopWorkOrders() {
+  return apiFetch('/shop/me/work-orders');
+}
+
+export function updateMyShopWorkOrderStatus(workOrderId, payload) {
+  return apiFetch(`/shop/me/work-orders/${workOrderId}/status`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      status: payload.status,
+      ownerNotes: payload.ownerNotes ?? '',
+    }),
+  });
+}
+
 export function respondToMyShopReview(reviewId, payload) {
   return apiFetch(`/shop/me/reviews/${reviewId}/response`, {
     method: 'POST',

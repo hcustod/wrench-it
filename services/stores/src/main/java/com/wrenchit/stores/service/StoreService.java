@@ -47,11 +47,11 @@ public class StoreService {
     }
 
     public Optional<Store> getById(UUID id) {
-        return storeRepository.findById(id);
+        return storeRepository.findByIdAndApprovalStatus(id, "APPROVED");
     }
 
     public Optional<Store> getByPlaceId(String placeId) {
-        return storeRepository.findByGooglePlaceId(placeId);
+        return storeRepository.findByGooglePlaceIdAndApprovalStatus(placeId, "APPROVED");
     }
 
     public String getPriceRange(UUID storeId) {
@@ -72,7 +72,9 @@ public class StoreService {
         if (ids == null || ids.isEmpty()) {
             return List.of();
         }
-        List<Store> stores = storeRepository.findAllById(ids);
+        List<Store> stores = storeRepository.findAllById(ids).stream()
+                .filter(this::isPubliclyVisible)
+                .toList();
         Map<UUID, Store> lookup = new HashMap<>();
         for (Store store : stores) {
             lookup.put(store.getId(), store);
@@ -164,7 +166,11 @@ public class StoreService {
                 total = stores.size();
                 stores = paginate(stores, offset, limit);
             } catch (RuntimeException ex) {
-                log.warn("Google Places search failed; falling back to local search. query='{}'", query, ex);
+                log.warn(
+                        "Google Places search failed; falling back to local search. query='{}', reason='{}'",
+                        query,
+                        ex.getMessage()
+                );
                 stores = storeRepository.searchLocal(query, DEFAULT_SIMILARITY, minRating, servicesContains, city, state, priceRange, hasWebsite, hasPhone, limit, offset);
                 total = storeRepository.countLocal(query, DEFAULT_SIMILARITY, minRating, servicesContains, city, state, priceRange, hasWebsite, hasPhone);
             }
@@ -199,6 +205,7 @@ public class StoreService {
         store.setLng(place.getLng());
         store.setRating(place.getRating());
         store.setRatingCount(place.getRatingCount());
+        store.setApprovalStatus("APPROVED");
         return storeRepository.save(store);
     }
 
@@ -213,10 +220,15 @@ public class StoreService {
         store.setLng(details.getLng());
         store.setRating(details.getRating());
         store.setRatingCount(details.getRatingCount());
+        store.setApprovalStatus("APPROVED");
         if (details.getServices() != null && !details.getServices().isEmpty()) {
             store.setServicesText(String.join(", ", details.getServices()));
         }
         return storeRepository.save(store);
+    }
+
+    private boolean isPubliclyVisible(Store store) {
+        return store != null && "APPROVED".equalsIgnoreCase(store.getApprovalStatus());
     }
 
     private List<Store> sortByPlaceIdOrder(List<Store> stores, List<String> placeIds) {

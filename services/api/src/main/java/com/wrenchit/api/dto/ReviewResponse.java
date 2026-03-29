@@ -9,6 +9,10 @@ public class ReviewResponse {
     public UUID userId;
     public UUID serviceId;
     public UUID receiptId;
+    public UUID workOrderId;
+    public String reviewerName;
+    public boolean hasReceipt;
+    public String verificationStatus;
     public int rating;
     public String comment;
     public OffsetDateTime createdAt;

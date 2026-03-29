@@ -52,6 +52,12 @@ public class Store {
     @Column(name = "services_text", length = 2000)
     private String servicesText;
 
+    @Column(name = "approval_status", nullable = false, length = 20)
+    private String approvalStatus = "APPROVED";
+
+    @Column(name = "approval_notes", length = 2000)
+    private String approvalNotes;
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
@@ -61,6 +67,9 @@ public class Store {
     @PrePersist
     void onCreate() {
         var now = OffsetDateTime.now();
+        if (approvalStatus == null || approvalStatus.isBlank()) {
+            approvalStatus = "APPROVED";
+        }
         createdAt = now;
         updatedAt = now;
     }
@@ -184,6 +193,22 @@ public class Store {
 
     public void setServicesText(String servicesText) {
         this.servicesText = servicesText;
+    }
+
+    public String getApprovalStatus() {
+        return approvalStatus;
+    }
+
+    public void setApprovalStatus(String approvalStatus) {
+        this.approvalStatus = approvalStatus;
+    }
+
+    public String getApprovalNotes() {
+        return approvalNotes;
+    }
+
+    public void setApprovalNotes(String approvalNotes) {
+        this.approvalNotes = approvalNotes;
     }
 
     public OffsetDateTime getCreatedAt() {

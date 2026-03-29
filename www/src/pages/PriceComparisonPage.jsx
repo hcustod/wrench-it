@@ -279,7 +279,7 @@ export default function PriceComparisonPage() {
           <h3 className="h6 text-white mb-2">Price Comparison Tips</h3>
           <ul className="mb-0 wt-text-muted small">
             <li>• Prices may vary based on your specific vehicle make and model.</li>
-            <li>• Call shops directly to confirm final pricing before booking.</li>
+            <li>• Call shops directly to confirm final pricing before choosing a shop.</li>
             <li>• Look for shops with verified mechanic badges for added trust.</li>
             <li>• Consider both price and ratings when making your decision.</li>
           </ul>
