@@ -1,18 +1,18 @@
 :80 {
-  root * /srv
-  encode gzip
+	root * /srv
+	encode gzip
 
-  handle /api/actuator/* {
-    uri strip_prefix /api
-    reverse_proxy api:8080
-  }
+	handle /api/actuator/* {
+		uri strip_prefix /api
+		reverse_proxy api:8080
+	}
 
-  handle /api/* {
-    reverse_proxy api:8080
-  }
+	handle /api/* {
+		reverse_proxy api:8080
+	}
 
-  handle {
-    try_files {path} /index.html
-    file_server
-  }
+	handle {
+		try_files {path} /index.html
+		file_server
+	}
 }
