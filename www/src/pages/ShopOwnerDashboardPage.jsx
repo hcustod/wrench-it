@@ -5,10 +5,17 @@ import {
   LuTrendingUp,
   LuMessageSquare,
   LuSettings2,
-  LuDollarSign,
+  LuCornerDownRight,
+  LuClipboardList,
+  LuTriangleAlert,
 } from 'react-icons/lu';
 import StatsCard from '../components/dashboard/StatsCard.jsx';
-import { getMyShopDashboard } from '../api/shop.js';
+import {
+  getMyShopDashboard,
+  respondToMyShopReview,
+  updateMyShopWorkOrderStatus,
+} from '../api/shop.js';
+import StatusBadge from '../components/common/StatusBadge.jsx';
 
 const EMPTY_SHOP_PROFILE = {
   name: 'Your Shop',
@@ -16,21 +23,56 @@ const EMPTY_SHOP_PROFILE = {
   reviewCount: 0,
   location: 'Unknown location',
   phone: '-',
+  approvalStatus: 'PENDING',
+  approvalNotes: '',
 };
 
 const EMPTY_STATS = {
   averageRating: 0,
   totalReviews: 0,
-  monthlyViews: 0,
+  profileReviewCount: 0,
   activeServices: 0,
 };
+
+function formatDateTime(value) {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
+function getWorkOrderActions(status) {
+  const normalized = typeof status === 'string' ? status.toUpperCase() : '';
+  if (normalized === 'REQUESTED') {
+    return [
+      { label: 'Confirm', status: 'CONFIRMED' },
+      { label: 'Decline', status: 'DECLINED' },
+    ];
+  }
+  if (normalized === 'CONFIRMED') {
+    return [{ label: 'Start Job', status: 'IN_PROGRESS' }];
+  }
+  if (normalized === 'IN_PROGRESS') {
+    return [{ label: 'Mark Complete', status: 'COMPLETED' }];
+  }
+  return [];
+}
 
 export default function ShopOwnerDashboardPage() {
   const [shopProfile, setShopProfile] = useState(EMPTY_SHOP_PROFILE);
   const [stats, setStats] = useState(EMPTY_STATS);
-  const [topServices, setTopServices] = useState([]);
+  const [serviceActivity, setServiceActivity] = useState([]);
+  const [workOrders, setWorkOrders] = useState([]);
   const [recentReviews, setRecentReviews] = useState([]);
   const [error, setError] = useState('');
+  const [respondingReviewId, setRespondingReviewId] = useState('');
+  const [updatingWorkOrderId, setUpdatingWorkOrderId] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -42,7 +84,8 @@ export default function ShopOwnerDashboardPage() {
 
         setShopProfile(data?.shopProfile ?? EMPTY_SHOP_PROFILE);
         setStats(data?.stats ?? EMPTY_STATS);
-        setTopServices(data?.topServices ?? []);
+        setServiceActivity(data?.serviceActivity ?? []);
+        setWorkOrders(data?.workOrders ?? []);
         setRecentReviews(data?.recentReviews ?? []);
         setError('');
       } catch (err) {
@@ -58,13 +101,80 @@ export default function ShopOwnerDashboardPage() {
     };
   }, []);
 
+  async function handleRespondToReview(review) {
+    if (!review?.id) return;
+
+    const currentResponse = typeof review.ownerResponse === 'string' ? review.ownerResponse : '';
+    const nextResponse = window.prompt(
+      'Write your response to this review:',
+      currentResponse,
+    );
+    if (nextResponse == null) return;
+
+    const trimmed = nextResponse.trim();
+    if (!trimmed) {
+      setError('Response cannot be empty.');
+      return;
+    }
+
+    setRespondingReviewId(review.id);
+    try {
+      const updated = await respondToMyShopReview(review.id, { response: trimmed });
+      setRecentReviews((current) =>
+        current.map((item) =>
+          item.id === review.id
+            ? {
+                ...item,
+                ownerResponse: updated?.ownerResponse ?? trimmed,
+                ownerResponseAt: updated?.ownerResponseAt ?? item.ownerResponseAt,
+                ownerResponseBy: updated?.ownerResponseBy ?? item.ownerResponseBy,
+              }
+            : item,
+        ),
+      );
+      setError('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save review response.');
+    } finally {
+      setRespondingReviewId('');
+    }
+  }
+
+  async function handleUpdateWorkOrder(workOrder, nextStatus) {
+    if (!workOrder?.id) return;
+    const ownerNotes = nextStatus === 'DECLINED'
+      ? window.prompt('Add a short reason for declining this work order:', workOrder.ownerNotes ?? '')
+      : workOrder.ownerNotes ?? '';
+    if (nextStatus === 'DECLINED' && ownerNotes == null) {
+      return;
+    }
+
+    setUpdatingWorkOrderId(workOrder.id);
+    try {
+      const updated = await updateMyShopWorkOrderStatus(workOrder.id, {
+        status: nextStatus,
+        ownerNotes: ownerNotes ?? '',
+      });
+      setWorkOrders((current) =>
+        current.map((item) => (item.id === workOrder.id ? updated : item)),
+      );
+      setError('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update work order.');
+    } finally {
+      setUpdatingWorkOrderId('');
+    }
+  }
+
+  const approvalStatus = shopProfile.approvalStatus ?? 'PENDING';
+  const isApproved = approvalStatus === 'APPROVED';
+
   return (
     <>
-      {/* Header */}
       <section className="mb-4">
         <h1 className="mb-1">Shop Dashboard</h1>
         <p className="wt-text-muted mb-0">
-          Manage your shop profile, services, and customer reviews.
+          Manage your shop profile, work orders, services, and customer reviews.
         </p>
         {error && (
           <p className="small mt-2 mb-0" style={{ color: '#FF8C42' }}>
@@ -73,7 +183,34 @@ export default function ShopOwnerDashboardPage() {
         )}
       </section>
 
-      {/* Stats grid */}
+      {!isApproved && (
+        <section className="mb-4">
+          <div
+            className="wt-card"
+            style={{
+              borderColor: approvalStatus === 'REJECTED' ? 'rgba(248,113,113,0.55)' : 'rgba(255,140,66,0.55)',
+              backgroundColor: approvalStatus === 'REJECTED' ? 'rgba(127,29,29,0.35)' : 'rgba(255,140,66,0.12)',
+            }}
+          >
+            <div className="d-flex align-items-start gap-3">
+              <LuTriangleAlert
+                size={20}
+                style={{ color: approvalStatus === 'REJECTED' ? '#f87171' : '#FF8C42', flexShrink: 0 }}
+              />
+              <div>
+                <div className="text-white mb-1">
+                  Shop approval status: {approvalStatus === 'REJECTED' ? 'Rejected' : 'Pending review'}
+                </div>
+                <div className="wt-text-muted small">
+                  Your shop profile is not public until an admin approves it.
+                  {shopProfile.approvalNotes ? ` Notes: ${shopProfile.approvalNotes}` : ''}
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
       <section className="mb-4">
         <div className="row g-3 g-md-4">
           <div className="col-12 col-sm-6 col-lg-3">
@@ -90,33 +227,33 @@ export default function ShopOwnerDashboardPage() {
               label="Total Reviews"
               value={stats.totalReviews ?? 0}
               tone="soft"
+              helper="Submitted through WrenchIt"
             />
           </div>
           <div className="col-12 col-sm-6 col-lg-3">
             <StatsCard
               icon={LuTrendingUp}
-              label="Monthly Views"
-              value={Number(stats.monthlyViews ?? 0).toLocaleString()}
+              label="Public Review Count"
+              value={Number(stats.profileReviewCount ?? 0).toLocaleString()}
               tone="success"
+              helper="Shown on your public profile"
             />
           </div>
           <div className="col-12 col-sm-6 col-lg-3">
             <StatsCard
-              icon={LuDollarSign}
+              icon={LuSettings2}
               label="Active Services"
               value={stats.activeServices ?? 0}
               tone="default"
+              helper="Currently listed services"
             />
           </div>
         </div>
       </section>
 
-      {/* Main two-column layout */}
       <section>
         <div className="row g-4">
-          {/* Left column */}
           <div className="col-12 col-lg-8 d-flex flex-column gap-4">
-            {/* Shop profile */}
             <div className="wt-card">
               <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-start gap-3 mb-3">
                 <div>
@@ -153,20 +290,98 @@ export default function ShopOwnerDashboardPage() {
                   <span className="wt-text-muted small">Location</span>
                   <span className="text-white">{shopProfile.location ?? '-'}</span>
                 </div>
-                <div className="d-flex justify-content-between align-items-center py-2">
+                <div className="d-flex justify-content-between align-items-center py-2 border-bottom border-opacity-25 border-secondary">
                   <span className="wt-text-muted small">Phone</span>
                   <span className="text-white">{shopProfile.phone ?? '-'}</span>
+                </div>
+                <div className="d-flex justify-content-between align-items-center py-2">
+                  <span className="wt-text-muted small">Approval</span>
+                  <StatusBadge status={approvalStatus} />
                 </div>
               </div>
             </div>
 
-            {/* Services & pricing */}
             <div className="wt-card">
               <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-start gap-3 mb-3">
                 <div>
-                  <h2 className="h5 text-white mb-1">Services &amp; pricing</h2>
+                  <h2 className="h5 text-white mb-1">Recent Work Orders</h2>
                   <p className="wt-text-muted small mb-0">
-                    Keep your menu up to date so drivers know what you offer.
+                    Real customer jobs now move through requested, confirmed, in-progress, and completed stages.
+                  </p>
+                </div>
+                <Link to="/manage-services" className="btn btn-wt-outline">
+                  Manage services
+                </Link>
+              </div>
+
+              <div className="d-flex flex-column gap-3">
+                {workOrders.map((workOrder) => (
+                  <div
+                    key={workOrder.id}
+                    className="rounded-4 p-3 p-md-4"
+                    style={{
+                      backgroundColor: '#2A2740',
+                      border: '1px solid #3A3652',
+                    }}
+                  >
+                    <div className="d-flex flex-column flex-md-row justify-content-between gap-3">
+                      <div>
+                        <div className="d-flex flex-wrap align-items-center gap-2 mb-1">
+                          <p className="text-white mb-0">{workOrder.customerName ?? 'Customer'}</p>
+                          <StatusBadge status={workOrder.status} />
+                        </div>
+                        <p className="wt-text-muted small mb-1">
+                          {workOrder.service} • {formatDateTime(workOrder.scheduledFor)}
+                        </p>
+                        {workOrder.vehicleLabel && (
+                          <p className="wt-text-muted small mb-1">
+                            Vehicle: {workOrder.vehicleLabel}
+                          </p>
+                        )}
+                        {workOrder.customerNotes && (
+                          <p className="wt-text-muted small mb-1">
+                            Customer notes: {workOrder.customerNotes}
+                          </p>
+                        )}
+                        {workOrder.ownerNotes && (
+                          <p className="wt-text-muted small mb-0">
+                            Shop notes: {workOrder.ownerNotes}
+                          </p>
+                        )}
+                      </div>
+                      <div className="d-flex flex-column gap-2 align-items-md-end">
+                        {getWorkOrderActions(workOrder.status).map((action) => (
+                          <button
+                            key={action.status}
+                            type="button"
+                            className={action.status === 'DECLINED' ? 'btn btn-sm btn-wt-outline' : 'btn btn-sm btn-wt-primary'}
+                            disabled={updatingWorkOrderId === workOrder.id}
+                            onClick={() => {
+                              void handleUpdateWorkOrder(workOrder, action.status);
+                            }}
+                          >
+                            {updatingWorkOrderId === workOrder.id ? 'Saving...' : action.label}
+                          </button>
+                        ))}
+                        {getWorkOrderActions(workOrder.status).length === 0 && (
+                          <span className="small wt-text-muted">No action required</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {workOrders.length === 0 && (
+                  <p className="wt-text-muted small mb-0">No work orders yet.</p>
+                )}
+              </div>
+            </div>
+
+            <div className="wt-card">
+              <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-start gap-3 mb-3">
+                <div>
+                  <h2 className="h5 text-white mb-1">Service Review Activity</h2>
+                  <p className="wt-text-muted small mb-0">
+                    Counts are based on reviews linked to each service. Base prices reflect your current listings.
                   </p>
                 </div>
                 <Link
@@ -179,7 +394,7 @@ export default function ShopOwnerDashboardPage() {
               </div>
 
               <div className="d-flex flex-column gap-3">
-                {topServices.map((service) => (
+                {serviceActivity.map((service) => (
                   <div
                     key={service.name}
                     className="rounded-4 p-3 p-md-4 d-flex justify-content-between align-items-center"
@@ -191,19 +406,22 @@ export default function ShopOwnerDashboardPage() {
                     <div>
                       <p className="text-white mb-1">{service.name}</p>
                       <p className="wt-text-muted small mb-0">
-                        {service.count ?? 0} services this month
+                        {service.reviewCount ?? service.count ?? 0} linked review
+                        {(service.reviewCount ?? service.count ?? 0) === 1 ? '' : 's'}
                       </p>
                     </div>
-                    <p className="mb-0 text-white">{service.revenue ?? '$0'}</p>
+                    <div className="text-end">
+                      <p className="mb-0 text-white">{service.basePrice ?? 'Call'}</p>
+                      <p className="wt-text-muted small mb-0">Base price</p>
+                    </div>
                   </div>
                 ))}
-                {topServices.length === 0 && (
-                  <p className="wt-text-muted small mb-0">No service activity yet.</p>
+                {serviceActivity.length === 0 && (
+                  <p className="wt-text-muted small mb-0">No service-linked review activity yet.</p>
                 )}
               </div>
             </div>
 
-            {/* Recent reviews */}
             <div className="wt-card">
               <div className="d-flex justify-content-between align-items-center mb-3">
                 <h2 className="h5 text-white mb-0">Recent reviews</h2>
@@ -244,6 +462,37 @@ export default function ShopOwnerDashboardPage() {
                       </div>
                     </div>
                     <p className="wt-text-muted small mb-0">{review.reviewText}</p>
+                    {review.ownerResponse && (
+                      <div
+                        className="rounded-4 p-3 mt-2"
+                        style={{
+                          backgroundColor: 'rgba(108,99,255,0.12)',
+                          border: '1px solid rgba(108,99,255,0.4)',
+                        }}
+                      >
+                        <p className="text-white small mb-1 d-flex align-items-center gap-2">
+                          <LuCornerDownRight size={14} />
+                          {review.ownerResponseBy ?? 'Shop Owner'} response
+                        </p>
+                        <p className="wt-text-muted small mb-0">{review.ownerResponse}</p>
+                      </div>
+                    )}
+                    <div className="mt-2">
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-wt-outline"
+                        disabled={respondingReviewId === review.id}
+                        onClick={() => {
+                          void handleRespondToReview(review);
+                        }}
+                      >
+                        {respondingReviewId === review.id
+                          ? 'Saving...'
+                          : review.ownerResponse
+                            ? 'Edit response'
+                            : 'Respond'}
+                      </button>
+                    </div>
                   </div>
                 ))}
                 {recentReviews.length === 0 && (
@@ -253,7 +502,6 @@ export default function ShopOwnerDashboardPage() {
             </div>
           </div>
 
-          {/* Right column */}
           <div className="col-12 col-lg-4 d-flex flex-column gap-4">
             <div
               className="wt-card"
@@ -263,16 +511,10 @@ export default function ShopOwnerDashboardPage() {
             >
               <h3 className="h6 text-white mb-3">Quick actions</h3>
               <div className="d-flex flex-column gap-2">
-                <Link
-                  to="/manage-shop"
-                  className="btn btn-sm btn-wt-outline text-start"
-                >
+                <Link to="/manage-shop" className="btn btn-sm btn-wt-outline text-start">
                   Edit shop information
                 </Link>
-                <Link
-                  to="/manage-services"
-                  className="btn btn-sm btn-wt-outline text-start"
-                >
+                <Link to="/manage-services" className="btn btn-sm btn-wt-outline text-start">
                   Manage services
                 </Link>
                 <Link to="/search" className="btn btn-sm btn-wt-outline text-start">
@@ -281,6 +523,12 @@ export default function ShopOwnerDashboardPage() {
                 <button
                   type="button"
                   className="btn btn-sm btn-wt-outline text-start"
+                  disabled={recentReviews.length === 0 || Boolean(respondingReviewId)}
+                  onClick={() => {
+                    const target = recentReviews[0];
+                    if (!target) return;
+                    void handleRespondToReview(target);
+                  }}
                 >
                   Respond to recent reviews
                 </button>
@@ -294,12 +542,15 @@ export default function ShopOwnerDashboardPage() {
                 borderColor: 'rgba(108,99,255,0.5)',
               }}
             >
-              <h3 className="h6 text-white mb-3">Growth tips</h3>
+              <h3 className="h6 text-white mb-3 d-flex align-items-center gap-2">
+                <LuClipboardList size={16} />
+                Growth tips
+              </h3>
               <ul className="mb-0 small wt-text-muted">
-                <li className="mb-1">Respond to reviews to build trust.</li>
+                <li className="mb-1">Confirm requests quickly so drivers trust your shop.</li>
+                <li className="mb-1">Complete work orders promptly to unlock more visit-based reviews.</li>
                 <li className="mb-1">Keep pricing and hours up to date.</li>
-                <li className="mb-1">Add photos of your shop and waiting area.</li>
-                <li>Highlight specialties like EV, fleet, or performance work.</li>
+                <li>Respond to reviews to build trust.</li>
               </ul>
             </div>
           </div>

@@ -1,14 +1,35 @@
-import { LuStar, LuBadgeCheck } from 'react-icons/lu';
+import { LuBadgeCheck, LuCircleAlert, LuClock3, LuStar } from 'react-icons/lu';
+
+const VERIFICATION_CONFIG = {
+  VERIFIED: {
+    label: 'Receipt verified',
+    className: 'wt-badge-verified',
+    Icon: LuBadgeCheck,
+  },
+  PENDING: {
+    label: 'Receipt under review',
+    className: 'wt-badge-pending',
+    Icon: LuClock3,
+  },
+  REJECTED: {
+    label: 'Receipt not verified',
+    className: 'wt-badge-rejected',
+    Icon: LuCircleAlert,
+  },
+};
 
 export default function ReviewCard({
   reviewerName,
   rating,
   reviewText,
-  isVerified = false,
-  isMechanicReview = false,
+  ownerResponse,
+  ownerResponseBy,
+  verificationStatus,
   date,
 }) {
   const fullStars = Math.round(rating ?? 0);
+  const verification = VERIFICATION_CONFIG[verificationStatus] ?? null;
+  const VerificationIcon = verification?.Icon;
 
   return (
     <div className="wt-card">
@@ -16,11 +37,11 @@ export default function ReviewCard({
         <div>
           <div className="d-flex align-items-center gap-2 mb-1">
             <span className="text-white">{reviewerName}</span>
-            {isVerified && (
-              <LuBadgeCheck size={18} style={{ color: '#6C63FF' }} />
-            )}
-            {isMechanicReview && (
-              <span className="wt-chip-service">Verified Mechanic</span>
+            {verification && VerificationIcon && (
+              <span className={verification.className}>
+                <VerificationIcon size={12} style={{ marginRight: 4 }} />
+                {verification.label}
+              </span>
             )}
           </div>
           <span className="wt-text-muted small">{date}</span>
@@ -41,7 +62,20 @@ export default function ReviewCard({
         </div>
       </div>
       <p className="wt-text-muted mb-0">{reviewText}</p>
+      {ownerResponse && (
+        <div
+          className="rounded-4 p-3 mt-3"
+          style={{
+            backgroundColor: 'rgba(108,99,255,0.12)',
+            border: '1px solid rgba(108,99,255,0.4)',
+          }}
+        >
+          <p className="text-white small mb-1">
+            {ownerResponseBy || 'Shop Owner'} response
+          </p>
+          <p className="wt-text-muted small mb-0">{ownerResponse}</p>
+        </div>
+      )}
     </div>
   );
 }
-

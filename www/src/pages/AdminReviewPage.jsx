@@ -8,10 +8,10 @@ import {
   LuCircleX,
 } from 'react-icons/lu';
 import {
-  decideMechanicReceipt,
-  getMechanicReceipt,
-  getMechanicReceiptFile,
-} from '../api/mechanic.js';
+  decideAdminReview,
+  getAdminReview,
+  getAdminReviewFile,
+} from '../api/admin.js';
 
 function decisionMessage(result) {
   if (result === 'APPROVED') return 'Verification approved.';
@@ -20,7 +20,7 @@ function decisionMessage(result) {
   return 'Decision saved.';
 }
 
-export default function ReviewVerificationPage() {
+export default function AdminReviewPage() {
   const { id } = useParams();
   const [note, setNote] = useState('');
   const [status, setStatus] = useState('');
@@ -39,7 +39,7 @@ export default function ReviewVerificationPage() {
       setLoading(true);
       setError('');
       try {
-        const data = await getMechanicReceipt(id);
+        const data = await getAdminReview(id);
         if (cancelled) return;
         setReview(data);
       } catch (err) {
@@ -73,7 +73,7 @@ export default function ReviewVerificationPage() {
 
       setPreviewError('');
       try {
-        const fileData = await getMechanicReceiptFile(id);
+        const fileData = await getAdminReviewFile(id);
         if (cancelled) return;
 
         objectUrl = URL.createObjectURL(fileData.blob);
@@ -119,7 +119,7 @@ export default function ReviewVerificationPage() {
     setError('');
 
     try {
-      const updated = await decideMechanicReceipt(id, {
+      const updated = await decideAdminReview(id, {
         result,
         notes: note.trim(),
       });
@@ -153,9 +153,9 @@ export default function ReviewVerificationPage() {
   return (
     <>
       <section className="mb-4">
-        <h1 className="mb-1">Receipt Verification</h1>
+        <h1 className="mb-1">Admin Receipt Verification</h1>
         <p className="wt-text-muted mb-0">
-          Review the receipt evidence attached to this customer review.
+          Review the receipt evidence and moderate verification decisions.
         </p>
       </section>
 
@@ -192,7 +192,6 @@ export default function ReviewVerificationPage() {
 
       <section>
         <div className="row g-4">
-          
           <div className="col-12 col-lg-6">
             <div className="wt-card">
               <div className="d-flex align-items-center gap-2 mb-3">
@@ -246,7 +245,6 @@ export default function ReviewVerificationPage() {
             </div>
           </div>
 
-          
           <div className="col-12 col-lg-6 d-flex flex-column gap-4">
             <div className="wt-card">
               <div className="d-flex align-items-center gap-2 mb-3">
@@ -336,7 +334,7 @@ export default function ReviewVerificationPage() {
                   <LuFileText size={32} className="wt-text-muted mb-2" />
                   <p className="wt-text-muted mb-1">No receipt uploaded.</p>
                   <p className="wt-text-muted small mb-0">
-                    Verify based on service details and overall context.
+                    Review based on service details and overall context.
                   </p>
                 </div>
               )}

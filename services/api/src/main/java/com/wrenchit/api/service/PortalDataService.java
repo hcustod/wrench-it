@@ -9,6 +9,7 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -31,6 +32,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wrenchit.api.dto.ReceiptCreateRequest;
 import com.wrenchit.api.dto.ShopProfileUpdateRequest;
 import com.wrenchit.api.dto.ShopServiceUpsertRequest;
+import com.wrenchit.api.dto.WorkOrderCreateRequest;
 
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
 import static org.springframework.http.HttpStatus.CONFLICT;
@@ -94,12 +96,10 @@ public class PortalDataService {
                 "Shop owner profile is missing shop name."
         );
 
-        // When mapping is missing, always create an owner-scoped store record.
-        // Binding to an existing global store by name is unsafe when names collide.
         UUID storeId = jdbc.queryForObject(
                 """
-                insert into stores (name, phone, created_at, updated_at)
-                values (:name, :phone, now(), now())
+                insert into stores (name, phone, approval_status, approval_requested_at, created_at, updated_at)
+                values (:name, :phone, 'PENDING', now(), now(), now())
                 returning id
                 """,
                 new MapSqlParameterSource()
@@ -136,8 +136,14 @@ public class PortalDataService {
                   s.phone,
                   s.city,
                   s.state,
+                  s.lat,
+                  s.lng,
                   s.rating,
                   s.rating_count,
+                  s.approval_status,
+                  s.approval_notes,
+                  s.approval_requested_at,
+                  s.approval_reviewed_at,
                   sp.description,
                   sp.hours_json
                 from stores s
@@ -158,8 +164,14 @@ public class PortalDataService {
         out.put("phone", row.get("phone"));
         out.put("city", row.get("city"));
         out.put("state", row.get("state"));
+        out.put("lat", row.get("lat"));
+        out.put("lng", row.get("lng"));
         out.put("rating", asDouble(row.get("rating")));
         out.put("reviewCount", asLong(row.get("rating_count")));
+        out.put("approvalStatus", row.get("approval_status"));
+        out.put("approvalNotes", normalizeOptional(Objects.toString(row.get("approval_notes"), null)));
+        out.put("approvalRequestedAt", toIso(row.get("approval_requested_at")));
+        out.put("approvalReviewedAt", toIso(row.get("approval_reviewed_at")));
         out.put("description", Objects.toString(row.get("description"), ""));
         out.put("hours", parseHours(row.get("hours_json")));
         return out;
@@ -169,11 +181,18 @@ public class PortalDataService {
         UUID normalizedOwnerUserId = requireUuid(ownerUserId, "ownerUserId is required");
         UUID storeId = resolveManagedStoreId(normalizedOwnerUserId);
         Map<String, Object> current = getManagedShop(normalizedOwnerUserId);
+        String approvalStatus = normalizeOptional(Objects.toString(current.get("approvalStatus"), null));
 
         String nextName = fallback(request.shopName, current.get("shopName"));
         String nextAddress = fallback(request.address, current.get("address"));
         String nextPhone = fallback(request.phone, current.get("phone"));
         String nextDescription = fallback(request.description, current.get("description"));
+        boolean addressChanged = !equalsIgnoreCase(
+                normalizeOptional(nextAddress),
+                normalizeOptional(Objects.toString(current.get("address"), null))
+        );
+        Double nextLat = addressChanged ? null : asDouble(current.get("lat"));
+        Double nextLng = addressChanged ? null : asDouble(current.get("lng"));
 
         Map<String, Object> nextHours = request.hours == null
                 ? castMap(current.get("hours"))
@@ -185,6 +204,28 @@ public class PortalDataService {
                 set name = :name,
                     address = :address,
                     phone = :phone,
+                    approval_status = case
+                        when :resubmitForApproval = true then 'PENDING'
+                        else approval_status
+                    end,
+                    approval_notes = case
+                        when :resubmitForApproval = true then null
+                        else approval_notes
+                    end,
+                    approval_requested_at = case
+                        when :resubmitForApproval = true then now()
+                        else approval_requested_at
+                    end,
+                    approval_reviewed_at = case
+                        when :resubmitForApproval = true then null
+                        else approval_reviewed_at
+                    end,
+                    approval_reviewed_by = case
+                        when :resubmitForApproval = true then null
+                        else approval_reviewed_by
+                    end,
+                    lat = :lat,
+                    lng = :lng,
                     updated_at = now()
                 where id = :storeId
                 """,
@@ -193,6 +234,9 @@ public class PortalDataService {
                         .addValue("name", nextName)
                         .addValue("address", nextAddress)
                         .addValue("phone", nextPhone)
+                        .addValue("resubmitForApproval", "REJECTED".equalsIgnoreCase(approvalStatus))
+                        .addValue("lat", nextLat)
+                        .addValue("lng", nextLng)
         );
 
         jdbc.update(
@@ -355,10 +399,10 @@ public class PortalDataService {
         Map<String, Object> stats = new LinkedHashMap<>();
         stats.put("totalReviews", totalReviews == null ? 0L : totalReviews);
         stats.put("averageRating", avgRating == null ? 0.0 : avgRating);
-        stats.put("monthlyViews", shop.get("reviewCount") == null ? 0L : asLong(shop.get("reviewCount")));
+        stats.put("profileReviewCount", shop.get("reviewCount") == null ? 0L : asLong(shop.get("reviewCount")));
         stats.put("activeServices", activeServices == null ? 0L : activeServices);
 
-        List<Map<String, Object>> topServices = jdbc.queryForList(
+        List<Map<String, Object>> serviceActivityRows = jdbc.queryForList(
                 """
                 select
                   sv.name,
@@ -377,17 +421,17 @@ public class PortalDataService {
                 new MapSqlParameterSource("storeId", storeId)
         );
 
-        List<Map<String, Object>> topServiceItems = new ArrayList<>();
-        for (Map<String, Object> row : topServices) {
+        List<Map<String, Object>> serviceActivityItems = new ArrayList<>();
+        for (Map<String, Object> row : serviceActivityRows) {
             long count = asLong(row.get("review_count"));
             Integer cents = asInt(row.get("base_price_cents"));
-            long revenueCents = cents == null ? 0L : count * cents;
 
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("name", row.get("name"));
+            item.put("reviewCount", count);
             item.put("count", count);
-            item.put("revenue", "$" + dollarsToString(centsToDollars((int) revenueCents)));
-            topServiceItems.add(item);
+            item.put("basePrice", cents == null ? "Call" : "$" + dollarsToString(centsToDollars(cents)));
+            serviceActivityItems.add(item);
         }
 
         List<Map<String, Object>> recentReviewsRows = jdbc.queryForList(
@@ -398,10 +442,15 @@ public class PortalDataService {
                   coalesce(sv.name, 'General Service') as service_name,
                   sr.created_at,
                   sr.rating,
-                  sr.comment
+                  sr.comment,
+                  srr.reply_text as owner_response,
+                  srr.updated_at as owner_response_at,
+                  coalesce(ou.display_name, 'Shop Owner') as owner_response_by
                 from store_reviews sr
                 left join users u on u.id = sr.user_id
                 left join services sv on sv.id = sr.service_id
+                left join store_review_replies srr on srr.review_id = sr.id
+                left join users ou on ou.id = srr.owner_user_id
                 where sr.store_id = :storeId
                 order by sr.created_at desc
                 limit 5
@@ -418,6 +467,9 @@ public class PortalDataService {
             item.put("date", toIso(row.get("created_at")));
             item.put("rating", asInt(row.get("rating")));
             item.put("reviewText", row.get("comment"));
+            item.put("ownerResponse", normalizeOptional(Objects.toString(row.get("owner_response"), null)));
+            item.put("ownerResponseAt", toIso(row.get("owner_response_at")));
+            item.put("ownerResponseBy", row.get("owner_response_by"));
             recentReviews.add(item);
         }
 
@@ -427,12 +479,153 @@ public class PortalDataService {
         shopProfile.put("reviewCount", shop.get("reviewCount"));
         shopProfile.put("location", buildLocation(shop));
         shopProfile.put("phone", shop.get("phone"));
+        shopProfile.put("approvalStatus", shop.get("approvalStatus"));
+        shopProfile.put("approvalNotes", shop.get("approvalNotes"));
+        shopProfile.put("approvalRequestedAt", shop.get("approvalRequestedAt"));
+        shopProfile.put("approvalReviewedAt", shop.get("approvalReviewedAt"));
 
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("shopProfile", shopProfile);
         out.put("stats", stats);
-        out.put("topServices", topServiceItems);
+        out.put("serviceActivity", serviceActivityItems);
         out.put("recentReviews", recentReviews);
+        out.put("workOrders", listManagedWorkOrders(ownerUserId).stream().limit(6).toList());
+        return out;
+    }
+
+    public List<Map<String, Object>> listManagedReviews(UUID ownerUserId) {
+        UUID storeId = resolveManagedStoreId(ownerUserId);
+        return listStoreReviewsWithReplies(storeId);
+    }
+
+    public Map<String, Object> respondToManagedReview(UUID ownerUserId, UUID reviewId, String response) {
+        UUID normalizedOwnerUserId = requireUuid(ownerUserId, "ownerUserId is required");
+        UUID normalizedReviewId = requireUuid(reviewId, "reviewId is required");
+        String normalizedResponse = normalizeRequired(response, "response is required");
+        UUID storeId = resolveManagedStoreId(normalizedOwnerUserId);
+
+        Long reviewMatch = jdbc.queryForObject(
+                """
+                select count(*)
+                from store_reviews
+                where id = :reviewId
+                  and store_id = :storeId
+                """,
+                new MapSqlParameterSource()
+                        .addValue("reviewId", normalizedReviewId)
+                        .addValue("storeId", storeId),
+                Long.class
+        );
+        if (reviewMatch == null || reviewMatch == 0L) {
+            throw new ResponseStatusException(NOT_FOUND, "Review not found for your managed shop.");
+        }
+
+        jdbc.update(
+                """
+                insert into store_review_replies (review_id, owner_user_id, reply_text, created_at, updated_at)
+                values (:reviewId, :ownerUserId, :replyText, now(), now())
+                on conflict (review_id)
+                do update set
+                  owner_user_id = excluded.owner_user_id,
+                  reply_text = excluded.reply_text,
+                  updated_at = now()
+                """,
+                new MapSqlParameterSource()
+                        .addValue("reviewId", normalizedReviewId)
+                        .addValue("ownerUserId", normalizedOwnerUserId)
+                        .addValue("replyText", normalizedResponse)
+        );
+
+        Map<String, Object> row = querySingleMap(
+                """
+                select
+                  sr.id,
+                  coalesce(srr.reply_text, '') as owner_response,
+                  srr.updated_at as owner_response_at,
+                  coalesce(ou.display_name, 'Shop Owner') as owner_response_by
+                from store_reviews sr
+                left join store_review_replies srr on srr.review_id = sr.id
+                left join users ou on ou.id = srr.owner_user_id
+                where sr.id = :reviewId
+                """,
+                new MapSqlParameterSource("reviewId", normalizedReviewId)
+        );
+        if (row == null) {
+            throw new ResponseStatusException(NOT_FOUND, "Review not found.");
+        }
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("id", row.get("id"));
+        out.put("ownerResponse", normalizeOptional(Objects.toString(row.get("owner_response"), null)));
+        out.put("ownerResponseAt", toIso(row.get("owner_response_at")));
+        out.put("ownerResponseBy", row.get("owner_response_by"));
+        return out;
+    }
+
+    public List<Map<String, Object>> listStoreReviewsWithReplies(UUID storeId) {
+        UUID normalizedStoreId = requireUuid(storeId, "storeId is required");
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                """
+                select
+                  sr.id,
+                  sr.store_id,
+                  sr.user_id,
+                  sr.service_id,
+                  sr.receipt_id,
+                  sr.work_order_id,
+                  coalesce(u.display_name, 'Customer') as reviewer_name,
+                  ru.status as receipt_status,
+                  rv.result as latest_validation_result,
+                  sr.rating,
+                  sr.comment,
+                  sr.created_at,
+                  srr.reply_text as owner_response,
+                  srr.updated_at as owner_response_at,
+                  coalesce(ou.display_name, 'Shop Owner') as owner_response_by
+                from store_reviews sr
+                left join users u on u.id = sr.user_id
+                left join receipt_uploads ru on ru.id = sr.receipt_id
+                left join lateral (
+                  select result
+                  from receipt_validations
+                  where receipt_id = sr.receipt_id
+                  order by validated_at desc
+                  limit 1
+                ) rv on true
+                left join store_review_replies srr on srr.review_id = sr.id
+                left join users ou on ou.id = srr.owner_user_id
+                where sr.store_id = :storeId
+                order by sr.created_at desc
+                """,
+                new MapSqlParameterSource("storeId", normalizedStoreId)
+        );
+
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Map<String, Object> row : rows) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("id", row.get("id"));
+            item.put("storeId", row.get("store_id"));
+            item.put("userId", row.get("user_id"));
+            item.put("serviceId", row.get("service_id"));
+            item.put("receiptId", row.get("receipt_id"));
+            item.put("workOrderId", row.get("work_order_id"));
+            item.put("reviewerName", row.get("reviewer_name"));
+            item.put("hasReceipt", row.get("receipt_id") != null);
+            item.put(
+                    "verificationStatus",
+                    publicReviewVerificationStatus(
+                            Objects.toString(row.get("latest_validation_result"), null),
+                            Objects.toString(row.get("receipt_status"), null)
+                    )
+            );
+            item.put("rating", asInt(row.get("rating")));
+            item.put("comment", row.get("comment"));
+            item.put("createdAt", toOffsetDateTime(row.get("created_at")));
+            item.put("ownerResponse", normalizeOptional(Objects.toString(row.get("owner_response"), null)));
+            item.put("ownerResponseAt", toOffsetDateTime(row.get("owner_response_at")));
+            item.put("ownerResponseBy", row.get("owner_response_by"));
+            out.add(item);
+        }
         return out;
     }
 
@@ -442,6 +635,8 @@ public class PortalDataService {
                 select distinct sv.name
                 from services sv
                 join store_services ss on ss.service_id = sv.id
+                join stores s on s.id = ss.store_id
+                where coalesce(s.approval_status, 'APPROVED') = 'APPROVED'
                 order by sv.name asc
                 """,
                 new MapSqlParameterSource()
@@ -473,6 +668,7 @@ public class PortalDataService {
                 join stores s on s.id = ss.store_id
                 left join v_store_rating_summary vs on vs.store_id = s.id
                 where lower(sv.name) = lower(:serviceName)
+                  and coalesce(s.approval_status, 'APPROVED') = 'APPROVED'
                 order by ss.base_price_cents asc nulls last, coalesce(vs.avg_rating, s.rating, 0) desc
                 """,
                 new MapSqlParameterSource("serviceName", normalizedService)
@@ -492,6 +688,303 @@ public class PortalDataService {
             items.add(item);
         }
         return items;
+    }
+
+    public Map<String, Object> createWorkOrder(UUID userId, WorkOrderCreateRequest request) {
+        UUID normalizedUserId = requireUuid(userId, "User is required");
+        UUID storeId = requireUuid(request.storeId, "Store is required");
+        UUID serviceId = requireUuid(request.serviceId, "Service is required");
+
+        Map<String, Object> store = querySingleMap(
+                """
+                select id
+                from stores
+                where id = :storeId
+                  and approval_status = 'APPROVED'
+                """,
+                new MapSqlParameterSource("storeId", storeId)
+        );
+        if (store == null) {
+            throw new ResponseStatusException(NOT_FOUND, "Store not found");
+        }
+
+        assertStoreServiceExists(storeId, serviceId);
+
+        OffsetDateTime scheduledFor = request.scheduledFor;
+        if (scheduledFor == null) {
+            throw new ResponseStatusException(BAD_REQUEST, "Scheduled time is required.");
+        }
+
+        String vehicleMake = normalizeOptional(request.vehicleMake);
+        String vehicleModel = normalizeOptional(request.vehicleModel);
+        Integer vehicleYear = request.vehicleYear;
+        if (vehicleYear != null && (vehicleYear < 1950 || vehicleYear > 2100)) {
+            throw new ResponseStatusException(BAD_REQUEST, "Vehicle year must be between 1950 and 2100.");
+        }
+
+        UUID workOrderId = jdbc.queryForObject(
+                """
+                insert into work_orders (
+                  store_id,
+                  customer_user_id,
+                  service_id,
+                  status,
+                  scheduled_for,
+                  vehicle_year,
+                  vehicle_make,
+                  vehicle_model,
+                  customer_notes
+                ) values (
+                  :storeId,
+                  :userId,
+                  :serviceId,
+                  'REQUESTED',
+                  :scheduledFor,
+                  :vehicleYear,
+                  :vehicleMake,
+                  :vehicleModel,
+                  :customerNotes
+                )
+                returning id
+                """,
+                new MapSqlParameterSource()
+                        .addValue("storeId", storeId)
+                        .addValue("userId", normalizedUserId)
+                        .addValue("serviceId", serviceId)
+                        .addValue("scheduledFor", scheduledFor)
+                        .addValue("vehicleYear", vehicleYear)
+                        .addValue("vehicleMake", vehicleMake)
+                        .addValue("vehicleModel", vehicleModel)
+                        .addValue("customerNotes", normalizeOptional(request.customerNotes)),
+                UUID.class
+        );
+
+        return getCustomerWorkOrder(normalizedUserId, workOrderId);
+    }
+
+    public List<Map<String, Object>> listCustomerWorkOrders(UUID userId) {
+        UUID normalizedUserId = requireUuid(userId, "User is required");
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                """
+                select
+                  wo.id,
+                  wo.store_id,
+                  coalesce(s.name, 'Unknown Shop') as store_name,
+                  wo.service_id,
+                  coalesce(sv.name, 'General Service') as service_name,
+                  wo.status,
+                  wo.scheduled_for,
+                  wo.vehicle_year,
+                  wo.vehicle_make,
+                  wo.vehicle_model,
+                  wo.customer_notes,
+                  wo.owner_notes,
+                  wo.estimated_total_cents,
+                  wo.completed_at,
+                  sr.id as review_id
+                from work_orders wo
+                left join stores s on s.id = wo.store_id
+                left join services sv on sv.id = wo.service_id
+                left join store_reviews sr on sr.work_order_id = wo.id
+                where wo.customer_user_id = :userId
+                order by wo.scheduled_for desc, wo.created_at desc
+                """,
+                new MapSqlParameterSource("userId", normalizedUserId)
+        );
+        return mapWorkOrders(rows, false);
+    }
+
+    public List<Map<String, Object>> listReviewableWorkOrders(UUID userId, UUID storeId) {
+        UUID normalizedUserId = requireUuid(userId, "User is required");
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                """
+                select
+                  wo.id,
+                  wo.store_id,
+                  coalesce(s.name, 'Unknown Shop') as store_name,
+                  wo.service_id,
+                  coalesce(sv.name, 'General Service') as service_name,
+                  wo.status,
+                  wo.scheduled_for,
+                  wo.vehicle_year,
+                  wo.vehicle_make,
+                  wo.vehicle_model,
+                  wo.customer_notes,
+                  wo.owner_notes,
+                  wo.estimated_total_cents,
+                  wo.completed_at,
+                  sr.id as review_id
+                from work_orders wo
+                left join stores s on s.id = wo.store_id
+                left join services sv on sv.id = wo.service_id
+                left join store_reviews sr on sr.work_order_id = wo.id
+                where wo.customer_user_id = :userId
+                  and wo.status = 'COMPLETED'
+                  and sr.id is null
+                  and (:storeId is null or wo.store_id = :storeId)
+                order by coalesce(wo.completed_at, wo.scheduled_for) desc, wo.created_at desc
+                """,
+                new MapSqlParameterSource()
+                        .addValue("userId", normalizedUserId)
+                        .addValue("storeId", storeId)
+        );
+        return mapWorkOrders(rows, false);
+    }
+
+    public List<Map<String, Object>> listManagedWorkOrders(UUID ownerUserId) {
+        UUID storeId = resolveManagedStoreId(ownerUserId);
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                """
+                select
+                  wo.id,
+                  wo.store_id,
+                  coalesce(s.name, 'Unknown Shop') as store_name,
+                  wo.service_id,
+                  coalesce(sv.name, 'General Service') as service_name,
+                  wo.status,
+                  wo.scheduled_for,
+                  wo.vehicle_year,
+                  wo.vehicle_make,
+                  wo.vehicle_model,
+                  wo.customer_notes,
+                  wo.owner_notes,
+                  wo.estimated_total_cents,
+                  wo.completed_at,
+                  sr.id as review_id,
+                  coalesce(u.display_name, u.email, 'Customer') as customer_name
+                from work_orders wo
+                left join stores s on s.id = wo.store_id
+                left join services sv on sv.id = wo.service_id
+                left join users u on u.id = wo.customer_user_id
+                left join store_reviews sr on sr.work_order_id = wo.id
+                where wo.store_id = :storeId
+                order by wo.scheduled_for asc, wo.created_at desc
+                """,
+                new MapSqlParameterSource("storeId", storeId)
+        );
+        return mapWorkOrders(rows, true);
+    }
+
+    public Map<String, Object> updateManagedWorkOrderStatus(UUID ownerUserId,
+                                                            UUID workOrderId,
+                                                            String status,
+                                                            String ownerNotes) {
+        UUID normalizedOwnerUserId = requireUuid(ownerUserId, "ownerUserId is required");
+        UUID normalizedWorkOrderId = requireUuid(workOrderId, "workOrderId is required");
+        String nextStatus = normalizeWorkOrderStatus(status);
+        UUID storeId = resolveManagedStoreId(normalizedOwnerUserId);
+
+        Map<String, Object> existing = querySingleMap(
+                """
+                select id, status
+                from work_orders
+                where id = :workOrderId
+                  and store_id = :storeId
+                """,
+                new MapSqlParameterSource()
+                        .addValue("workOrderId", normalizedWorkOrderId)
+                        .addValue("storeId", storeId)
+        );
+        if (existing == null) {
+            throw new ResponseStatusException(NOT_FOUND, "Work order not found for your managed shop.");
+        }
+
+        String currentStatus = Objects.toString(existing.get("status"), "");
+        if (!isAllowedWorkOrderTransition(currentStatus, nextStatus)) {
+            throw new ResponseStatusException(CONFLICT, "Invalid work order status transition.");
+        }
+
+        jdbc.update(
+                """
+                update work_orders
+                set status = :status,
+                    owner_notes = coalesce(:ownerNotes, owner_notes),
+                    completed_at = case
+                      when :status = 'COMPLETED' then now()
+                      when :status <> 'COMPLETED' then null
+                      else completed_at
+                    end,
+                    updated_at = now()
+                where id = :workOrderId
+                """,
+                new MapSqlParameterSource()
+                        .addValue("workOrderId", normalizedWorkOrderId)
+                        .addValue("status", nextStatus)
+                        .addValue("ownerNotes", normalizeOptional(ownerNotes))
+        );
+
+        return getManagedWorkOrder(storeId, normalizedWorkOrderId);
+    }
+
+    public Map<String, Object> decideShopApproval(UUID storeId,
+                                                  UUID reviewerUserId,
+                                                  String result,
+                                                  String notes) {
+        UUID normalizedStoreId = requireUuid(storeId, "storeId is required");
+        UUID normalizedReviewerUserId = requireUuid(reviewerUserId, "reviewerUserId is required");
+        String normalizedDecision = normalizeShopApprovalDecision(result);
+
+        Map<String, Object> store = querySingleMap(
+                """
+                select id, approval_status
+                from stores
+                where id = :storeId
+                """,
+                new MapSqlParameterSource("storeId", normalizedStoreId)
+        );
+        if (store == null) {
+            throw new ResponseStatusException(NOT_FOUND, "Shop not found");
+        }
+
+        String currentStatus = normalizeOptional(Objects.toString(store.get("approval_status"), null));
+        if ("APPROVED".equals(normalizedDecision) && "APPROVED".equalsIgnoreCase(currentStatus)) {
+            throw new ResponseStatusException(CONFLICT, "Shop is already approved.");
+        }
+
+        jdbc.update(
+                """
+                update stores
+                set approval_status = :approvalStatus,
+                    approval_notes = :approvalNotes,
+                    approval_reviewed_at = now(),
+                    approval_reviewed_by = :reviewerUserId,
+                    updated_at = now()
+                where id = :storeId
+                """,
+                new MapSqlParameterSource()
+                        .addValue("storeId", normalizedStoreId)
+                        .addValue("approvalStatus", normalizedDecision)
+                        .addValue("approvalNotes", normalizeOptional(notes))
+                        .addValue("reviewerUserId", normalizedReviewerUserId)
+        );
+
+        Map<String, Object> updated = querySingleMap(
+                """
+                select
+                  s.id,
+                  s.name,
+                  coalesce(u.display_name, u.email, 'Shop Owner') as owner_name,
+                  coalesce(nullif(trim(concat_ws(', ', s.city, s.state)), ''), s.address, 'Unknown location') as location,
+                  s.approval_status,
+                  s.approval_notes,
+                  s.approval_reviewed_at
+                from stores s
+                left join shop_owner_stores sos on sos.store_id = s.id
+                left join users u on u.id = sos.owner_user_id
+                where s.id = :storeId
+                """,
+                new MapSqlParameterSource("storeId", normalizedStoreId)
+        );
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("id", updated.get("id"));
+        out.put("name", updated.get("name"));
+        out.put("owner", updated.get("owner_name"));
+        out.put("location", updated.get("location"));
+        out.put("status", titleizeApprovalStatus(Objects.toString(updated.get("approval_status"), "")));
+        out.put("notes", normalizeOptional(Objects.toString(updated.get("approval_notes"), null)));
+        out.put("reviewedAt", toIso(updated.get("approval_reviewed_at")));
+        return out;
     }
 
     public Map<String, Object> createReceipt(UUID userId, ReceiptCreateRequest request) {
@@ -732,6 +1225,7 @@ public class PortalDataService {
         Map<String, Object> stats = new LinkedHashMap<>();
         stats.put("totalVerified", approvedCount == null ? 0L : approvedCount);
         stats.put("thisWeek", thisWeek == null ? 0L : thisWeek);
+        stats.put("pendingVerifications", pendingCount == null ? 0L : pendingCount);
         stats.put("pendingReviews", pendingCount == null ? 0L : pendingCount);
         stats.put("reputation", reputation);
 
@@ -842,7 +1336,7 @@ public class PortalDataService {
         );
 
         Map<String, Object> out = getReceiptDetail(receiptId);
-        out.put("message", "Decision saved");
+        out.put("message", "Verification decision saved.");
         return out;
     }
 
@@ -850,6 +1344,11 @@ public class PortalDataService {
         Long totalUsers = jdbc.queryForObject("select count(*) from users", new MapSqlParameterSource(), Long.class);
         Long totalShops = jdbc.queryForObject("select count(*) from stores", new MapSqlParameterSource(), Long.class);
         Long totalReviews = jdbc.queryForObject("select count(*) from store_reviews", new MapSqlParameterSource(), Long.class);
+        Long pendingShopApprovals = jdbc.queryForObject(
+                "select count(*) from stores where approval_status = 'PENDING'",
+                new MapSqlParameterSource(),
+                Long.class
+        );
         Long issues = jdbc.queryForObject(
                 """
                 select count(*)
@@ -860,6 +1359,7 @@ public class PortalDataService {
                 new MapSqlParameterSource(),
                 Long.class
         );
+        long issueCount = (issues == null ? 0L : issues) + (pendingShopApprovals == null ? 0L : pendingShopApprovals);
 
         List<Map<String, Object>> userRows = jdbc.queryForList(
                 """
@@ -914,7 +1414,7 @@ public class PortalDataService {
             flagged.add(item);
         }
 
-        List<Map<String, Object>> pendingRows = jdbc.queryForList(
+        List<Map<String, Object>> pendingReceiptRows = jdbc.queryForList(
                 """
                 select
                   rd.id,
@@ -931,29 +1431,95 @@ public class PortalDataService {
                 new MapSqlParameterSource()
         );
 
-        List<Map<String, Object>> pending = new ArrayList<>();
-        for (Map<String, Object> row : pendingRows) {
+        List<Map<String, Object>> pendingReceipts = new ArrayList<>();
+        for (Map<String, Object> row : pendingReceiptRows) {
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("id", row.get("id"));
             item.put("name", row.get("name"));
             item.put("owner", row.get("owner"));
             item.put("location", row.get("location"));
             item.put("status", "Pending");
-            pending.add(item);
+            pendingReceipts.add(item);
+        }
+
+        List<Map<String, Object>> pendingShopRows = jdbc.queryForList(
+                """
+                select
+                  s.id,
+                  s.name,
+                  coalesce(u.display_name, u.email, 'Shop Owner') as owner_name,
+                  coalesce(nullif(trim(concat_ws(', ', s.city, s.state)), ''), s.address, 'Unknown location') as location,
+                  s.approval_requested_at,
+                  u.business_license
+                from stores s
+                join shop_owner_stores sos on sos.store_id = s.id
+                join users u on u.id = sos.owner_user_id
+                where s.approval_status = 'PENDING'
+                order by s.approval_requested_at desc nulls last, s.created_at desc
+                limit 20
+                """,
+                new MapSqlParameterSource()
+        );
+
+        List<Map<String, Object>> pendingShops = new ArrayList<>();
+        for (Map<String, Object> row : pendingShopRows) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("id", row.get("id"));
+            item.put("name", row.get("name"));
+            item.put("owner", row.get("owner_name"));
+            item.put("location", row.get("location"));
+            item.put("submittedAt", toIso(row.get("approval_requested_at")));
+            item.put("businessLicense", normalizeOptional(Objects.toString(row.get("business_license"), null)));
+            item.put("status", "Pending");
+            pendingShops.add(item);
         }
 
         Map<String, Object> stats = new LinkedHashMap<>();
         stats.put("totalUsers", totalUsers == null ? 0L : totalUsers);
         stats.put("totalShops", totalShops == null ? 0L : totalShops);
         stats.put("totalReviews", totalReviews == null ? 0L : totalReviews);
-        stats.put("issues", issues == null ? 0L : issues);
+        stats.put("issues", issueCount);
+        stats.put("pendingShopApprovals", pendingShopApprovals == null ? 0L : pendingShopApprovals);
 
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("stats", stats);
         out.put("users", users);
+        out.put("rejectedVerifications", flagged);
+        out.put("pendingReceipts", pendingReceipts);
         out.put("flaggedReviews", flagged);
-        out.put("pendingShops", pending);
+        out.put("pendingShops", pendingShops);
+        out.put("pendingShopApprovals", pendingShops);
         return out;
+    }
+
+    public List<Map<String, Object>> listAdminUsers(int requestedLimit) {
+        int safeLimit = Math.max(1, Math.min(requestedLimit, 200));
+        List<Map<String, Object>> userRows = jdbc.queryForList(
+                """
+                select
+                  id,
+                  coalesce(display_name, 'User') as name,
+                  email,
+                  role,
+                  created_at
+                from users
+                order by created_at desc
+                limit :limit
+                """,
+                new MapSqlParameterSource("limit", safeLimit)
+        );
+
+        List<Map<String, Object>> users = new ArrayList<>();
+        for (Map<String, Object> row : userRows) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("id", row.get("id"));
+            item.put("name", row.get("name"));
+            item.put("email", row.get("email"));
+            item.put("type", row.get("role"));
+            item.put("joined", toIso(row.get("created_at")));
+            users.add(item);
+        }
+        return users;
     }
 
     public Map<String, Object> getUserDashboard(UUID userId) {
@@ -961,11 +1527,14 @@ public class PortalDataService {
             throw new ResponseStatusException(BAD_REQUEST, "User is required");
         }
 
+        List<Map<String, Object>> workOrders = listCustomerWorkOrders(userId);
+
         List<Map<String, Object>> reviewRows = jdbc.queryForList(
                 """
                 select
                   sr.id,
                   sr.store_id,
+                  sr.work_order_id,
                   coalesce(s.name, 'Unknown Shop') as store_name,
                   coalesce(sv.name, 'General Service') as service_name,
                   sr.created_at,
@@ -988,6 +1557,7 @@ public class PortalDataService {
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("id", row.get("id"));
             item.put("storeId", row.get("store_id"));
+            item.put("workOrderId", row.get("work_order_id"));
             item.put("shopName", row.get("store_name"));
             item.put("service", row.get("service_name"));
             item.put("date", toIso(row.get("created_at")));
@@ -997,7 +1567,7 @@ public class PortalDataService {
             reviews.add(item);
         }
 
-        List<Map<String, Object>> bookingRows = jdbc.queryForList(
+        List<Map<String, Object>> receiptRows = jdbc.queryForList(
                 """
                 select
                   id,
@@ -1014,8 +1584,8 @@ public class PortalDataService {
                 new MapSqlParameterSource("userId", userId)
         );
 
-        List<Map<String, Object>> bookings = new ArrayList<>();
-        for (Map<String, Object> row : bookingRows) {
+        List<Map<String, Object>> receiptSubmissions = new ArrayList<>();
+        for (Map<String, Object> row : receiptRows) {
             Map<String, Object> item = new LinkedHashMap<>();
             String createdAt = toIso(row.get("created_at"));
             item.put("id", row.get("id"));
@@ -1024,37 +1594,57 @@ public class PortalDataService {
             item.put("service", row.get("service_name"));
             item.put("date", createdAt);
             item.put("time", createdAt);
-            item.put("status", bookingStatus(Objects.toString(row.get("status"), null)));
-            bookings.add(item);
+            item.put("status", receiptSubmissionStatus(Objects.toString(row.get("status"), null)));
+            receiptSubmissions.add(item);
         }
 
         Map<String, Object> out = new LinkedHashMap<>();
+        out.put("workOrders", workOrders);
         out.put("reviews", reviews);
-        out.put("bookings", bookings);
+        out.put("receiptSubmissions", receiptSubmissions);
+        out.put("bookings", workOrders);
         return out;
     }
 
-    public void validateReviewReferences(UUID storeId, UUID userId, UUID serviceId, UUID receiptId) {
+    public ReviewReferenceResolution validateReviewReferences(UUID storeId,
+                                                              UUID userId,
+                                                              UUID serviceId,
+                                                              UUID receiptId,
+                                                              UUID workOrderId) {
         requireUuid(storeId, "storeId is required");
         requireUuid(userId, "userId is required");
+        UUID normalizedWorkOrderId = requireUuid(workOrderId, "Completed work order is required.");
 
-        if (serviceId != null) {
-            Long serviceMatch = jdbc.queryForObject(
-                    """
-                    select count(*)
-                    from store_services
-                    where store_id = :storeId
-                      and service_id = :serviceId
-                    """,
-                    new MapSqlParameterSource()
-                            .addValue("storeId", storeId)
-                            .addValue("serviceId", serviceId),
-                    Long.class
-            );
-            if (serviceMatch == null || serviceMatch == 0L) {
-                throw new ResponseStatusException(BAD_REQUEST, "Selected service does not belong to this store.");
-            }
+        Map<String, Object> workOrder = querySingleMap(
+                """
+                select
+                  service_id,
+                  status
+                from work_orders
+                where id = :workOrderId
+                  and store_id = :storeId
+                  and customer_user_id = :userId
+                """,
+                new MapSqlParameterSource()
+                        .addValue("workOrderId", normalizedWorkOrderId)
+                        .addValue("storeId", storeId)
+                        .addValue("userId", userId)
+        );
+        if (workOrder == null) {
+            throw new ResponseStatusException(BAD_REQUEST, "Work order not found for this store.");
         }
+
+        String workOrderStatus = Objects.toString(workOrder.get("status"), "");
+        if (!"COMPLETED".equalsIgnoreCase(workOrderStatus)) {
+            throw new ResponseStatusException(CONFLICT, "Only completed work orders can be reviewed.");
+        }
+
+        UUID resolvedServiceId = (UUID) workOrder.get("service_id");
+        if (serviceId != null && !serviceId.equals(resolvedServiceId)) {
+            throw new ResponseStatusException(BAD_REQUEST, "Selected service does not match the completed work order.");
+        }
+
+        assertStoreServiceExists(storeId, resolvedServiceId);
 
         if (receiptId != null) {
             Map<String, Object> receipt = querySingleMap(
@@ -1077,6 +1667,135 @@ public class PortalDataService {
             if (!storeId.equals(receiptStoreId)) {
                 throw new ResponseStatusException(BAD_REQUEST, "Receipt does not belong to this store.");
             }
+        }
+
+        return new ReviewReferenceResolution(resolvedServiceId, receiptId, normalizedWorkOrderId);
+    }
+
+    private Map<String, Object> getCustomerWorkOrder(UUID userId, UUID workOrderId) {
+        List<Map<String, Object>> items = jdbc.queryForList(
+                """
+                select
+                  wo.id,
+                  wo.store_id,
+                  coalesce(s.name, 'Unknown Shop') as store_name,
+                  wo.service_id,
+                  coalesce(sv.name, 'General Service') as service_name,
+                  wo.status,
+                  wo.scheduled_for,
+                  wo.vehicle_year,
+                  wo.vehicle_make,
+                  wo.vehicle_model,
+                  wo.customer_notes,
+                  wo.owner_notes,
+                  wo.estimated_total_cents,
+                  wo.completed_at,
+                  sr.id as review_id
+                from work_orders wo
+                left join stores s on s.id = wo.store_id
+                left join services sv on sv.id = wo.service_id
+                left join store_reviews sr on sr.work_order_id = wo.id
+                where wo.id = :workOrderId
+                  and wo.customer_user_id = :userId
+                """,
+                new MapSqlParameterSource()
+                        .addValue("workOrderId", workOrderId)
+                        .addValue("userId", userId)
+        );
+        if (items.isEmpty()) {
+            throw new ResponseStatusException(NOT_FOUND, "Work order not found.");
+        }
+        return mapWorkOrders(items, false).get(0);
+    }
+
+    private Map<String, Object> getManagedWorkOrder(UUID storeId, UUID workOrderId) {
+        List<Map<String, Object>> items = jdbc.queryForList(
+                """
+                select
+                  wo.id,
+                  wo.store_id,
+                  coalesce(s.name, 'Unknown Shop') as store_name,
+                  wo.service_id,
+                  coalesce(sv.name, 'General Service') as service_name,
+                  wo.status,
+                  wo.scheduled_for,
+                  wo.vehicle_year,
+                  wo.vehicle_make,
+                  wo.vehicle_model,
+                  wo.customer_notes,
+                  wo.owner_notes,
+                  wo.estimated_total_cents,
+                  wo.completed_at,
+                  sr.id as review_id,
+                  coalesce(u.display_name, u.email, 'Customer') as customer_name
+                from work_orders wo
+                left join stores s on s.id = wo.store_id
+                left join services sv on sv.id = wo.service_id
+                left join users u on u.id = wo.customer_user_id
+                left join store_reviews sr on sr.work_order_id = wo.id
+                where wo.id = :workOrderId
+                  and wo.store_id = :storeId
+                """,
+                new MapSqlParameterSource()
+                        .addValue("workOrderId", workOrderId)
+                        .addValue("storeId", storeId)
+        );
+        if (items.isEmpty()) {
+            throw new ResponseStatusException(NOT_FOUND, "Work order not found.");
+        }
+        return mapWorkOrders(items, true).get(0);
+    }
+
+    private List<Map<String, Object>> mapWorkOrders(List<Map<String, Object>> rows, boolean includeCustomer) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Map<String, Object> row : rows) {
+            OffsetDateTime scheduledFor = toOffsetDateTime(row.get("scheduled_for"));
+            boolean hasReview = row.get("review_id") != null;
+            String status = normalizeOptional(Objects.toString(row.get("status"), null));
+
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("id", row.get("id"));
+            item.put("storeId", row.get("store_id"));
+            item.put("shopName", row.get("store_name"));
+            item.put("serviceId", row.get("service_id"));
+            item.put("service", row.get("service_name"));
+            item.put("status", status);
+            item.put("scheduledFor", scheduledFor);
+            item.put("date", toIso(scheduledFor));
+            item.put("time", toIso(scheduledFor));
+            item.put("vehicleYear", row.get("vehicle_year"));
+            item.put("vehicleMake", row.get("vehicle_make"));
+            item.put("vehicleModel", row.get("vehicle_model"));
+            item.put("vehicleLabel", buildVehicleLabel(row.get("vehicle_year"), row.get("vehicle_make"), row.get("vehicle_model")));
+            item.put("customerNotes", normalizeOptional(Objects.toString(row.get("customer_notes"), null)));
+            item.put("ownerNotes", normalizeOptional(Objects.toString(row.get("owner_notes"), null)));
+            item.put("estimatedTotal", centsToDollars(asInt(row.get("estimated_total_cents"))));
+            item.put("completedAt", toIso(row.get("completed_at")));
+            item.put("hasReview", hasReview);
+            item.put("canReview", "COMPLETED".equalsIgnoreCase(status) && !hasReview);
+            if (includeCustomer) {
+                item.put("customerName", row.get("customer_name"));
+            }
+            out.add(item);
+        }
+        return out;
+    }
+
+    private void assertStoreServiceExists(UUID storeId, UUID serviceId) {
+        Long serviceMatch = jdbc.queryForObject(
+                """
+                select count(*)
+                from store_services
+                where store_id = :storeId
+                  and service_id = :serviceId
+                """,
+                new MapSqlParameterSource()
+                        .addValue("storeId", storeId)
+                        .addValue("serviceId", serviceId),
+                Long.class
+        );
+        if (serviceMatch == null || serviceMatch == 0L) {
+            throw new ResponseStatusException(BAD_REQUEST, "Selected service does not belong to this store.");
         }
     }
 
@@ -1231,20 +1950,57 @@ public class PortalDataService {
 
     private String reviewStatus(String receiptStatus) {
         if (receiptStatus == null) {
+            return "published";
+        }
+        String normalized = receiptStatus.toUpperCase(Locale.ROOT);
+        if ("APPROVED".equals(normalized)) {
             return "verified";
         }
-        return "APPROVED".equalsIgnoreCase(receiptStatus) ? "verified" : "pending";
+        if ("REJECTED".equals(normalized)) {
+            return "rejected";
+        }
+        return "pending";
     }
 
-    private String bookingStatus(String receiptStatus) {
-        if (receiptStatus == null) {
-            return "completed";
+    private String receiptSubmissionStatus(String receiptStatus) {
+        if (receiptStatus == null || receiptStatus.isBlank()) {
+            return "pending";
         }
         String normalized = receiptStatus.toUpperCase(Locale.ROOT);
         if (normalized.equals("UPLOADED") || normalized.equals("PROCESSING") || normalized.equals("READY_FOR_REVIEW")) {
-            return "upcoming";
+            return "pending";
         }
-        return "completed";
+        if (normalized.equals("APPROVED")) {
+            return "verified";
+        }
+        return "rejected";
+    }
+
+    private String publicReviewVerificationStatus(String validationResult, String receiptStatus) {
+        String normalizedValidation = normalizeOptional(validationResult);
+        if (normalizedValidation != null) {
+            String upperValidation = normalizedValidation.toUpperCase(Locale.ROOT);
+            if ("APPROVED".equals(upperValidation)) {
+                return "VERIFIED";
+            }
+            if ("REJECTED".equals(upperValidation)) {
+                return "REJECTED";
+            }
+        }
+
+        String normalizedReceiptStatus = normalizeOptional(receiptStatus);
+        if (normalizedReceiptStatus == null) {
+            return "UNVERIFIED";
+        }
+
+        String upperReceiptStatus = normalizedReceiptStatus.toUpperCase(Locale.ROOT);
+        if ("APPROVED".equals(upperReceiptStatus)) {
+            return "VERIFIED";
+        }
+        if ("REJECTED".equals(upperReceiptStatus)) {
+            return "REJECTED";
+        }
+        return "PENDING";
     }
 
     private String normalizeDecision(String result) {
@@ -1410,6 +2166,23 @@ public class PortalDataService {
         return new LinkedHashMap<>();
     }
 
+    private String buildVehicleLabel(Object yearValue, Object makeValue, Object modelValue) {
+        List<String> parts = new ArrayList<>();
+        String year = normalizeOptional(Objects.toString(yearValue, null));
+        String make = normalizeOptional(Objects.toString(makeValue, null));
+        String model = normalizeOptional(Objects.toString(modelValue, null));
+        if (year != null) {
+            parts.add(year);
+        }
+        if (make != null) {
+            parts.add(make);
+        }
+        if (model != null) {
+            parts.add(model);
+        }
+        return parts.isEmpty() ? null : String.join(" ", parts);
+    }
+
     private Map<String, Object> querySingleMap(String sql, MapSqlParameterSource params) {
         List<Map<String, Object>> rows = jdbc.queryForList(sql, params);
         return rows.isEmpty() ? null : rows.get(0);
@@ -1561,10 +2334,79 @@ public class PortalDataService {
         return value.toString();
     }
 
+    private OffsetDateTime toOffsetDateTime(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof OffsetDateTime odt) {
+            return odt;
+        }
+        if (value instanceof Timestamp ts) {
+            return ts.toInstant().atOffset(ZoneOffset.UTC);
+        }
+        if (value instanceof Instant instant) {
+            return instant.atOffset(ZoneOffset.UTC);
+        }
+        if (value instanceof String text) {
+            try {
+                return OffsetDateTime.parse(text);
+            } catch (DateTimeParseException ignored) {
+                return null;
+            }
+        }
+        return null;
+    }
+
     private String coalesceString(Object value, String fallback) {
         String normalized = normalizeOptional(Objects.toString(value, null));
         return normalized == null ? fallback : normalized;
     }
+
+    private String normalizeWorkOrderStatus(String status) {
+        String normalized = normalizeRequired(status, "Work order status is required").toUpperCase(Locale.ROOT);
+        return switch (normalized) {
+            case "REQUESTED", "CONFIRMED", "IN_PROGRESS", "COMPLETED", "DECLINED", "CANCELED" -> normalized;
+            default -> throw new ResponseStatusException(BAD_REQUEST, "Unsupported work order status.");
+        };
+    }
+
+    private boolean isAllowedWorkOrderTransition(String currentStatus, String nextStatus) {
+        String current = normalizeOptional(currentStatus);
+        if (current == null) {
+            return false;
+        }
+        if (current.equalsIgnoreCase(nextStatus)) {
+            return true;
+        }
+        return switch (current.toUpperCase(Locale.ROOT)) {
+            case "REQUESTED" -> "CONFIRMED".equals(nextStatus) || "DECLINED".equals(nextStatus) || "CANCELED".equals(nextStatus);
+            case "CONFIRMED" -> "IN_PROGRESS".equals(nextStatus) || "CANCELED".equals(nextStatus);
+            case "IN_PROGRESS" -> "COMPLETED".equals(nextStatus);
+            default -> false;
+        };
+    }
+
+    private String normalizeShopApprovalDecision(String result) {
+        String normalized = normalizeRequired(result, "Decision is required").toUpperCase(Locale.ROOT);
+        return switch (normalized) {
+            case "APPROVED", "REJECTED" -> normalized;
+            default -> throw new ResponseStatusException(BAD_REQUEST, "Shop decision must be APPROVED or REJECTED.");
+        };
+    }
+
+    private String titleizeApprovalStatus(String approvalStatus) {
+        String normalized = normalizeOptional(approvalStatus);
+        if (normalized == null) {
+            return "Pending";
+        }
+        return switch (normalized.toUpperCase(Locale.ROOT)) {
+            case "APPROVED" -> "Approved";
+            case "REJECTED" -> "Rejected";
+            default -> "Pending";
+        };
+    }
+
+    public record ReviewReferenceResolution(UUID serviceId, UUID receiptId, UUID workOrderId) {}
 
     public record ReceiptFileData(Path path, String originalFilename, String mimeType) {}
 }

@@ -18,11 +18,13 @@ export default function MechanicOwnerRegistrationPage() {
     businessLicense: '',
   });
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
 
   function handleChange(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
+    setFieldErrors((prev) => ({ ...prev, [field]: undefined }));
     setError('');
     setSuccess('');
   }
@@ -30,6 +32,7 @@ export default function MechanicOwnerRegistrationPage() {
   async function handleSubmit(e) {
     e.preventDefault();
     setError('');
+    setFieldErrors({});
     setSuccess('');
 
     if (form.password !== form.confirmPassword) {
@@ -55,6 +58,9 @@ export default function MechanicOwnerRegistrationPage() {
       navigate(result.returnTo ?? returnTo, { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to register.');
+      if (err && typeof err === 'object' && err.errors && typeof err.errors === 'object') {
+        setFieldErrors(err.errors);
+      }
     } finally {
       setLoading(false);
     }
@@ -87,7 +93,7 @@ export default function MechanicOwnerRegistrationPage() {
             </div>
           )}
 
-          {/* Role selector */}
+          
           <div
             className="mb-3 rounded-4 p-3"
             style={{ backgroundColor: '#2A2740', border: '2px solid rgba(255,140,66,0.3)' }}
@@ -144,7 +150,7 @@ export default function MechanicOwnerRegistrationPage() {
           </div>
 
           <form onSubmit={handleSubmit} noValidate className="d-flex flex-column gap-3">
-            {/* Common fields */}
+            
             <div>
               <label className="form-label text-white small mb-1">Full Name *</label>
               <div className="input-group">
@@ -159,6 +165,11 @@ export default function MechanicOwnerRegistrationPage() {
                   onChange={(e) => handleChange('fullName', e.target.value)}
                 />
               </div>
+              {fieldErrors.fullName && (
+                <div className="small mt-1" style={{ color: '#FF8C42' }}>
+                  {fieldErrors.fullName}
+                </div>
+              )}
             </div>
 
             <div>
@@ -175,6 +186,11 @@ export default function MechanicOwnerRegistrationPage() {
                   onChange={(e) => handleChange('email', e.target.value)}
                 />
               </div>
+              {fieldErrors.email && (
+                <div className="small mt-1" style={{ color: '#FF8C42' }}>
+                  {fieldErrors.email}
+                </div>
+              )}
             </div>
 
             <div>
@@ -192,6 +208,11 @@ export default function MechanicOwnerRegistrationPage() {
                   required
                 />
               </div>
+              {fieldErrors.phone && (
+                <div className="small mt-1" style={{ color: '#FF8C42' }}>
+                  {fieldErrors.phone}
+                </div>
+              )}
             </div>
 
             <div className="row g-2">
@@ -209,6 +230,11 @@ export default function MechanicOwnerRegistrationPage() {
                     onChange={(e) => handleChange('password', e.target.value)}
                   />
                 </div>
+                {fieldErrors.password && (
+                  <div className="small mt-1" style={{ color: '#FF8C42' }}>
+                    {fieldErrors.password}
+                  </div>
+                )}
               </div>
               <div className="col-12 col-md-6">
                 <label className="form-label text-white small mb-1">Confirm Password *</label>
@@ -232,7 +258,7 @@ export default function MechanicOwnerRegistrationPage() {
               </div>
             </div>
 
-            {/* Conditional fields */}
+            
             {isMechanic ? (
               <div className="row g-2">
                 <div className="col-12 col-md-6">
@@ -246,6 +272,11 @@ export default function MechanicOwnerRegistrationPage() {
                     value={form.certificationNumber}
                     onChange={(e) => handleChange('certificationNumber', e.target.value)}
                   />
+                  {fieldErrors.certificationNumber && (
+                    <div className="small mt-1" style={{ color: '#FF8C42' }}>
+                      {fieldErrors.certificationNumber}
+                    </div>
+                  )}
                 </div>
                 <div className="col-12 col-md-6">
                   <label className="form-label text-white small mb-1">
@@ -259,6 +290,11 @@ export default function MechanicOwnerRegistrationPage() {
                     value={form.yearsExperience}
                     onChange={(e) => handleChange('yearsExperience', e.target.value)}
                   />
+                  {fieldErrors.yearsExperience && (
+                    <div className="small mt-1" style={{ color: '#FF8C42' }}>
+                      {fieldErrors.yearsExperience}
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (
@@ -273,6 +309,11 @@ export default function MechanicOwnerRegistrationPage() {
                     onChange={(e) => handleChange('shopName', e.target.value)}
                     required={!isMechanic}
                   />
+                  {fieldErrors.shopName && (
+                    <div className="small mt-1" style={{ color: '#FF8C42' }}>
+                      {fieldErrors.shopName}
+                    </div>
+                  )}
                 </div>
                 <div className="col-12 col-md-6">
                   <label className="form-label text-white small mb-1">
@@ -285,6 +326,11 @@ export default function MechanicOwnerRegistrationPage() {
                     value={form.businessLicense}
                     onChange={(e) => handleChange('businessLicense', e.target.value)}
                   />
+                  {fieldErrors.businessLicense && (
+                    <div className="small mt-1" style={{ color: '#FF8C42' }}>
+                      {fieldErrors.businessLicense}
+                    </div>
+                  )}
                 </div>
               </div>
             )}

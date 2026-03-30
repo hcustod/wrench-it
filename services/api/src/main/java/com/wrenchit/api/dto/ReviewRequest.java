@@ -19,4 +19,6 @@ public class ReviewRequest {
     public UUID serviceId;
 
     public UUID receiptId;
+
+    public UUID workOrderId;
 }

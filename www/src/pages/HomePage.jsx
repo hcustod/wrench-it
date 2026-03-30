@@ -29,7 +29,9 @@ export default function HomePage() {
           setFeaturedShops(items.slice(0, 4));
         }
       } catch {
-        // keep existing empty state; backend team can refine handling later
+        if (!cancelled) {
+          setFeaturedShops([]);
+        }
       }
     }
     loadFeatured();
@@ -40,7 +42,7 @@ export default function HomePage() {
 
   return (
     <>
-      {/* Hero Section */}
+      
       <section className="py-5 py-lg-6">
         <div className="container">
           <div className="text-center mb-4 mb-lg-5">
@@ -48,7 +50,7 @@ export default function HomePage() {
               Find honest, local mechanics you can trust.
             </h1>
             <p className="wt-text-muted mx-auto mb-4" style={{ maxWidth: '40rem' }}>
-              Compare prices, read verified reviews, and choose the right shop for your car.
+              Compare prices, read receipt-backed reviews, and choose the right shop for your car.
             </p>
           </div>
 
@@ -107,7 +109,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Value Pillars */}
+      
       <section className="py-5">
         <div className="container">
           <div className="row g-4">
@@ -120,7 +122,7 @@ export default function HomePage() {
                 </div>
                 <h3 className="h5 mb-2">Verified Reviews</h3>
                 <p className="wt-text-muted mb-0">
-                  All reviews are verified by certified mechanics for authenticity.
+                  Reviews with approved receipt evidence are marked as verified.
                 </p>
               </div>
             </div>
@@ -134,7 +136,7 @@ export default function HomePage() {
                 </div>
                 <h3 className="h5 mb-2">Transparent Prices</h3>
                 <p className="wt-text-muted mb-0">
-                  Compare prices across shops before booking your service.
+                  Compare prices across shops before choosing where to go.
                 </p>
               </div>
             </div>
@@ -156,7 +158,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Featured Shops */}
+      
       <section className="py-5">
         <div className="container">
           <div className="text-center mb-4 mb-lg-5">
@@ -186,4 +188,3 @@ export default function HomePage() {
     </>
   );
 }
-

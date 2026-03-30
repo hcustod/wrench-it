@@ -17,15 +17,35 @@ public interface StoreRepository extends JpaRepository<Store, UUID> {
 
     List<Store> findByGooglePlaceIdIn(List<String> googlePlaceIds);
 
+    Optional<Store> findByIdAndApprovalStatus(UUID id, String approvalStatus);
+
+    Optional<Store> findByGooglePlaceIdAndApprovalStatus(String googlePlaceId, String approvalStatus);
+
     @Query(value = """
             select *
             from stores
-            where (search_vector @@ plainto_tsquery('english', :query)
+            where coalesce(approval_status, 'APPROVED') = 'APPROVED'
+              and (search_vector @@ plainto_tsquery('english', :query)
                    or similarity(name, :query) > :minSimilarity)
               and (:minRating is null or rating >= :minRating)
               and (:servicesContains is null or services_text ilike concat('%', :servicesContains, '%'))
               and (:city is null or lower(city) = lower(:city))
               and (:state is null or lower(state) = lower(:state))
+              and (
+                :priceRange is null
+                or exists (
+                  select 1
+                  from store_services ss
+                  where ss.store_id = stores.id
+                    and ss.base_price_cents is not null
+                  group by ss.store_id
+                  having (
+                    (:priceRange = '$' and avg(ss.base_price_cents) < 5000)
+                    or (:priceRange = '$$' and avg(ss.base_price_cents) >= 5000 and avg(ss.base_price_cents) < 15000)
+                    or (:priceRange = '$$$' and avg(ss.base_price_cents) >= 15000)
+                  )
+                )
+              )
               and (:hasWebsite is null or (:hasWebsite = true and website is not null and website <> '') or (:hasWebsite = false and (website is null or website = '')))
               and (:hasPhone is null or (:hasPhone = true and phone is not null and phone <> '') or (:hasPhone = false and (phone is null or phone = '')))
             order by ts_rank(search_vector, plainto_tsquery('english', :query)) desc,
@@ -38,6 +58,7 @@ public interface StoreRepository extends JpaRepository<Store, UUID> {
                             @Param("servicesContains") String servicesContains,
                             @Param("city") String city,
                             @Param("state") String state,
+                            @Param("priceRange") String priceRange,
                             @Param("hasWebsite") Boolean hasWebsite,
                             @Param("hasPhone") Boolean hasPhone,
                             @Param("limit") int limit,
@@ -46,12 +67,28 @@ public interface StoreRepository extends JpaRepository<Store, UUID> {
     @Query(value = """
             select count(*)
             from stores
-            where (search_vector @@ plainto_tsquery('english', :query)
+            where coalesce(approval_status, 'APPROVED') = 'APPROVED'
+              and (search_vector @@ plainto_tsquery('english', :query)
                    or similarity(name, :query) > :minSimilarity)
               and (:minRating is null or rating >= :minRating)
               and (:servicesContains is null or services_text ilike concat('%', :servicesContains, '%'))
               and (:city is null or lower(city) = lower(:city))
               and (:state is null or lower(state) = lower(:state))
+              and (
+                :priceRange is null
+                or exists (
+                  select 1
+                  from store_services ss
+                  where ss.store_id = stores.id
+                    and ss.base_price_cents is not null
+                  group by ss.store_id
+                  having (
+                    (:priceRange = '$' and avg(ss.base_price_cents) < 5000)
+                    or (:priceRange = '$$' and avg(ss.base_price_cents) >= 5000 and avg(ss.base_price_cents) < 15000)
+                    or (:priceRange = '$$$' and avg(ss.base_price_cents) >= 15000)
+                  )
+                )
+              )
               and (:hasWebsite is null or (:hasWebsite = true and website is not null and website <> '') or (:hasWebsite = false and (website is null or website = '')))
               and (:hasPhone is null or (:hasPhone = true and phone is not null and phone <> '') or (:hasPhone = false and (phone is null or phone = '')))
             """, nativeQuery = true)
@@ -61,17 +98,34 @@ public interface StoreRepository extends JpaRepository<Store, UUID> {
                     @Param("servicesContains") String servicesContains,
                     @Param("city") String city,
                     @Param("state") String state,
+                    @Param("priceRange") String priceRange,
                     @Param("hasWebsite") Boolean hasWebsite,
                     @Param("hasPhone") Boolean hasPhone);
 
     @Query(value = """
             select *
             from stores
-            where lat is not null and lng is not null
+            where coalesce(approval_status, 'APPROVED') = 'APPROVED'
+              and lat is not null and lng is not null
               and (:minRating is null or rating >= :minRating)
               and (:servicesContains is null or services_text ilike concat('%', :servicesContains, '%'))
               and (:city is null or lower(city) = lower(:city))
               and (:state is null or lower(state) = lower(:state))
+              and (
+                :priceRange is null
+                or exists (
+                  select 1
+                  from store_services ss
+                  where ss.store_id = stores.id
+                    and ss.base_price_cents is not null
+                  group by ss.store_id
+                  having (
+                    (:priceRange = '$' and avg(ss.base_price_cents) < 5000)
+                    or (:priceRange = '$$' and avg(ss.base_price_cents) >= 5000 and avg(ss.base_price_cents) < 15000)
+                    or (:priceRange = '$$$' and avg(ss.base_price_cents) >= 15000)
+                  )
+                )
+              )
               and (:hasWebsite is null or (:hasWebsite = true and website is not null and website <> '') or (:hasWebsite = false and (website is null or website = '')))
               and (:hasPhone is null or (:hasPhone = true and phone is not null and phone <> '') or (:hasPhone = false and (phone is null or phone = '')))
               and (
@@ -95,6 +149,7 @@ public interface StoreRepository extends JpaRepository<Store, UUID> {
                                    @Param("servicesContains") String servicesContains,
                                    @Param("city") String city,
                                    @Param("state") String state,
+                                   @Param("priceRange") String priceRange,
                                    @Param("hasWebsite") Boolean hasWebsite,
                                    @Param("hasPhone") Boolean hasPhone,
                                    @Param("limit") int limit,
@@ -103,11 +158,27 @@ public interface StoreRepository extends JpaRepository<Store, UUID> {
     @Query(value = """
             select count(*)
             from stores
-            where lat is not null and lng is not null
+            where coalesce(approval_status, 'APPROVED') = 'APPROVED'
+              and lat is not null and lng is not null
               and (:minRating is null or rating >= :minRating)
               and (:servicesContains is null or services_text ilike concat('%', :servicesContains, '%'))
               and (:city is null or lower(city) = lower(:city))
               and (:state is null or lower(state) = lower(:state))
+              and (
+                :priceRange is null
+                or exists (
+                  select 1
+                  from store_services ss
+                  where ss.store_id = stores.id
+                    and ss.base_price_cents is not null
+                  group by ss.store_id
+                  having (
+                    (:priceRange = '$' and avg(ss.base_price_cents) < 5000)
+                    or (:priceRange = '$$' and avg(ss.base_price_cents) >= 5000 and avg(ss.base_price_cents) < 15000)
+                    or (:priceRange = '$$$' and avg(ss.base_price_cents) >= 15000)
+                  )
+                )
+              )
               and (:hasWebsite is null or (:hasWebsite = true and website is not null and website <> '') or (:hasWebsite = false and (website is null or website = '')))
               and (:hasPhone is null or (:hasPhone = true and phone is not null and phone <> '') or (:hasPhone = false and (phone is null or phone = '')))
               and (
@@ -124,19 +195,36 @@ public interface StoreRepository extends JpaRepository<Store, UUID> {
                            @Param("servicesContains") String servicesContains,
                            @Param("city") String city,
                            @Param("state") String state,
+                           @Param("priceRange") String priceRange,
                            @Param("hasWebsite") Boolean hasWebsite,
                            @Param("hasPhone") Boolean hasPhone);
 
     @Query(value = """
             select *
             from stores
-            where lat is not null and lng is not null
+            where coalesce(approval_status, 'APPROVED') = 'APPROVED'
+              and lat is not null and lng is not null
               and (search_vector @@ plainto_tsquery('english', :query)
                    or similarity(name, :query) > :minSimilarity)
               and (:minRating is null or rating >= :minRating)
               and (:servicesContains is null or services_text ilike concat('%', :servicesContains, '%'))
               and (:city is null or lower(city) = lower(:city))
               and (:state is null or lower(state) = lower(:state))
+              and (
+                :priceRange is null
+                or exists (
+                  select 1
+                  from store_services ss
+                  where ss.store_id = stores.id
+                    and ss.base_price_cents is not null
+                  group by ss.store_id
+                  having (
+                    (:priceRange = '$' and avg(ss.base_price_cents) < 5000)
+                    or (:priceRange = '$$' and avg(ss.base_price_cents) >= 5000 and avg(ss.base_price_cents) < 15000)
+                    or (:priceRange = '$$$' and avg(ss.base_price_cents) >= 15000)
+                  )
+                )
+              )
               and (:hasWebsite is null or (:hasWebsite = true and website is not null and website <> '') or (:hasWebsite = false and (website is null or website = '')))
               and (:hasPhone is null or (:hasPhone = true and phone is not null and phone <> '') or (:hasPhone = false and (phone is null or phone = '')))
               and (
@@ -158,6 +246,7 @@ public interface StoreRepository extends JpaRepository<Store, UUID> {
                                         @Param("servicesContains") String servicesContains,
                                         @Param("city") String city,
                                         @Param("state") String state,
+                                        @Param("priceRange") String priceRange,
                                         @Param("hasWebsite") Boolean hasWebsite,
                                         @Param("hasPhone") Boolean hasPhone,
                                         @Param("limit") int limit,
@@ -166,13 +255,29 @@ public interface StoreRepository extends JpaRepository<Store, UUID> {
     @Query(value = """
             select count(*)
             from stores
-            where lat is not null and lng is not null
+            where coalesce(approval_status, 'APPROVED') = 'APPROVED'
+              and lat is not null and lng is not null
               and (search_vector @@ plainto_tsquery('english', :query)
                    or similarity(name, :query) > :minSimilarity)
               and (:minRating is null or rating >= :minRating)
               and (:servicesContains is null or services_text ilike concat('%', :servicesContains, '%'))
               and (:city is null or lower(city) = lower(:city))
               and (:state is null or lower(state) = lower(:state))
+              and (
+                :priceRange is null
+                or exists (
+                  select 1
+                  from store_services ss
+                  where ss.store_id = stores.id
+                    and ss.base_price_cents is not null
+                  group by ss.store_id
+                  having (
+                    (:priceRange = '$' and avg(ss.base_price_cents) < 5000)
+                    or (:priceRange = '$$' and avg(ss.base_price_cents) >= 5000 and avg(ss.base_price_cents) < 15000)
+                    or (:priceRange = '$$$' and avg(ss.base_price_cents) >= 15000)
+                  )
+                )
+              )
               and (:hasWebsite is null or (:hasWebsite = true and website is not null and website <> '') or (:hasWebsite = false and (website is null or website = '')))
               and (:hasPhone is null or (:hasPhone = true and phone is not null and phone <> '') or (:hasPhone = false and (phone is null or phone = '')))
               and (
@@ -191,13 +296,15 @@ public interface StoreRepository extends JpaRepository<Store, UUID> {
                                 @Param("servicesContains") String servicesContains,
                                 @Param("city") String city,
                                 @Param("state") String state,
+                                @Param("priceRange") String priceRange,
                                 @Param("hasWebsite") Boolean hasWebsite,
                                 @Param("hasPhone") Boolean hasPhone);
 
     @Query("""
             select s
             from Store s
-            where (:minRating is null or s.rating >= :minRating)
+            where s.approvalStatus = 'APPROVED'
+              and (:minRating is null or s.rating >= :minRating)
               and (
                 :servicesContains is null
                 or lower(coalesce(s.servicesText, '')) like concat('%', lower(cast(:servicesContains as string)), '%')
@@ -222,6 +329,45 @@ public interface StoreRepository extends JpaRepository<Store, UUID> {
                                   @Param("hasWebsite") Boolean hasWebsite,
                                   @Param("hasPhone") Boolean hasPhone,
                                   Pageable pageable);
+
+    @Query("""
+            select s
+            from Store s
+            where s.approvalStatus = 'APPROVED'
+              and (:minRating is null or s.rating >= :minRating)
+              and (
+                :servicesContains is null
+                or lower(coalesce(s.servicesText, '')) like concat('%', lower(cast(:servicesContains as string)), '%')
+              )
+              and (:city is null or lower(s.city) = lower(cast(:city as string)))
+              and (:state is null or lower(s.state) = lower(cast(:state as string)))
+              and (
+                :hasWebsite is null
+                or (:hasWebsite = true and s.website is not null and s.website <> '')
+                or (:hasWebsite = false and (s.website is null or s.website = ''))
+              )
+              and (
+                :hasPhone is null
+                or (:hasPhone = true and s.phone is not null and s.phone <> '')
+                or (:hasPhone = false and (s.phone is null or s.phone = ''))
+              )
+            """)
+    List<Store> findAllFiltered(@Param("minRating") Double minRating,
+                                @Param("servicesContains") String servicesContains,
+                                @Param("city") String city,
+                                @Param("state") String state,
+                                @Param("hasWebsite") Boolean hasWebsite,
+                                @Param("hasPhone") Boolean hasPhone,
+                                org.springframework.data.domain.Sort sort);
+
+    @Query(value = """
+            select ss.store_id, avg(ss.base_price_cents)
+            from store_services ss
+            where ss.store_id in (:storeIds)
+              and ss.base_price_cents is not null
+            group by ss.store_id
+            """, nativeQuery = true)
+    List<Object[]> findAverageServicePriceCentsByStoreIds(@Param("storeIds") List<UUID> storeIds);
 
     List<Store> findAllByOrderByRatingCountDesc(Pageable pageable);
 }

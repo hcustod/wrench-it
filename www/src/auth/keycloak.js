@@ -62,12 +62,21 @@ export function routeForRole(role) {
 }
 
 export async function getCurrentUser() {
-  const response = await fetch('/api/me', {
-    method: 'GET',
-    credentials: 'include',
-  });
+  const requestMe = () =>
+    fetch('/api/me', {
+      method: 'GET',
+      credentials: 'include',
+    });
 
-  const payload = await parseJsonSafe(response);
+  let response = await requestMe();
+  let payload = await parseJsonSafe(response);
+
+  if (response.status === 401) {
+    await refreshSession();
+    response = await requestMe();
+    payload = await parseJsonSafe(response);
+  }
+
   if (!response.ok) {
     throw toError(response, payload, 'Unable to load session user.');
   }
@@ -109,6 +118,16 @@ export async function beginRegistration(options = {}) {
   return { returnTo: routeForRole(me?.role) };
 }
 
+export async function beginPasswordReset(options = {}) {
+  return postAuth(
+    'forgot-password',
+    {
+      email: options.email,
+    },
+    'Unable to start password reset.'
+  );
+}
+
 export async function refreshSession() {
   return postAuth('refresh', null, 'Session refresh failed.');
 }
@@ -116,7 +135,7 @@ export async function refreshSession() {
 export async function logout() {
   try {
     await postAuth('logout', null, 'Logout failed.');
-  } catch {
-    // Ignore logout failures on the client. Session may already be cleared.
+  } catch (err) {
+    void err;
   }
 }

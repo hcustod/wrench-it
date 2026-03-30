@@ -1,6 +1,6 @@
 ## WrenchIT Frontend (www/)
 
-Modern React/Vite frontend for the WrenchIT platform – a marketplace to help drivers find honest local mechanics, compare prices, and manage reviews and bookings. This app focuses on a pixel-perfect, dark-theme UI that mirrors the Figma design while providing clean seams for backend integration.
+Modern React/Vite frontend for the WrenchIT platform – a marketplace to help drivers find honest local mechanics, compare prices, request work orders, and manage visit-based reviews. This app focuses on a pixel-perfect, dark-theme UI that mirrors the Figma design while providing clean seams for backend integration.
 
 ### Tech stack
 
@@ -18,7 +18,7 @@ Modern React/Vite frontend for the WrenchIT platform – a marketplace to help d
 ### Key features (frontend)
 
 - **Public pages**: Home, search, shop profile, price comparison, login/register, not found
-- **Review flows**: Write review, review verification dashboard, user dashboard for reviews/bookings/saved shops
+- **Review flows**: Visit-based review submission, review verification dashboard, user dashboard for work orders/reviews/saved shops
 - **Dashboards**: User dashboard plus mechanic, shop-owner, and admin dashboards wired to backend endpoints
 - **Management screens**: Manage shop info and services for shop owners via `/api/shop/me/*`
 
