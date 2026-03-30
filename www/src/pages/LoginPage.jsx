@@ -81,15 +81,24 @@ export default function LoginPage() {
                   className="form-check-input"
                   type="checkbox"
                   id="remember"
+                  disabled
+                  title="Not available in this release"
                 />
-                <label className="form-check-label wt-text-muted" htmlFor="remember">
+                <label
+                  className="form-check-label wt-text-muted"
+                  htmlFor="remember"
+                  style={{ opacity: 0.65 }}
+                  title="Not available in this release"
+                >
                   Remember me
                 </label>
               </div>
               <button
                 type="button"
                 className="btn btn-link p-0 small"
-                style={{ color: '#6C63FF', textDecoration: 'none' }}
+                style={{ color: '#6C63FF', textDecoration: 'none', opacity: 0.65 }}
+                disabled
+                title="Password reset is not available yet — contact support if you need access"
               >
                 Forgot password?
               </button>

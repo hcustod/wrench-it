@@ -6,7 +6,8 @@ export default defineConfig({
   server: {
     proxy: {
       "/api": {
-        target: "http://localhost:8081",
+        // Spring Boot API default in services/api (local dev). Docker static www uses 8081; run API on 8080 when using Vite.
+        target: "http://localhost:8080",
         changeOrigin: true,
       },
     },

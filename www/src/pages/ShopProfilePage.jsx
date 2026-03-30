@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { LuStar, LuMapPin, LuPhone, LuClock, LuArrowRight } from 'react-icons/lu';
+import { LuStar, LuMapPin, LuPhone, LuClock, LuArrowRight, LuHeart } from 'react-icons/lu';
 import { getStore, listStoreServices } from '../api/stores.js';
 import { listReviews } from '../api/reviews.js';
+import { listSavedShops, saveShop, unsaveShop } from '../api/saved.js';
+import { getCurrentUser } from '../auth/keycloak.js';
 import ReviewCard from '../components/review/ReviewCard.jsx';
 
 function formatDate(value) {
@@ -35,6 +37,38 @@ function formatHoursWindow(hours) {
   if (!open && !close) return null;
   if (open === 'Closed') return 'Closed';
   return close ? `${open} - ${close}` : open;
+}
+
+/** Digits only for tel: href (works with most clients). */
+function digitsForTel(phone) {
+  if (!phone || typeof phone !== 'string') return '';
+  return phone.replace(/\D/g, '');
+}
+
+/** Open Google Maps: coordinates preferred, else search by address. */
+function buildGoogleMapsDirectionsUrl(shop) {
+  const lat = shop?.lat != null ? Number(shop.lat) : null;
+  const lng = shop?.lng != null ? Number(shop.lng) : null;
+  if (lat != null && lng != null && !Number.isNaN(lat) && !Number.isNaN(lng)) {
+    return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+  }
+  const q = [shop?.address, shop?.city, shop?.state].filter(Boolean).join(', ') || shop?.location || '';
+  if (!q.trim()) return '';
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q.trim())}`;
+}
+
+/** Backend may add reviewer display name later; until then show neutral label. */
+function pickReviewerName(rev) {
+  if (rev && typeof rev.reviewerName === 'string' && rev.reviewerName.trim()) {
+    return rev.reviewerName.trim();
+  }
+  if (rev && typeof rev.displayName === 'string' && rev.displayName.trim()) {
+    return rev.displayName.trim();
+  }
+  if (rev && typeof rev.authorName === 'string' && rev.authorName.trim()) {
+    return rev.authorName.trim();
+  }
+  return 'Member';
 }
 
 function resolveMapsApiKey() {
@@ -74,6 +108,10 @@ export default function ShopProfilePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [mapStatus, setMapStatus] = useState('');
+  const [isSaved, setIsSaved] = useState(false);
+  const [saveBusy, setSaveBusy] = useState(false);
+  const [saveAvailable, setSaveAvailable] = useState(false);
+  const [saveError, setSaveError] = useState('');
   const mapHostRef = useRef(null);
   const mapRef = useRef(null);
   const mapMarkerRef = useRef(null);
@@ -98,11 +136,11 @@ export default function ShopProfilePage() {
 
         const apiReviews = (reviewsRes ?? []).map((rev) => ({
           id: rev.id,
-          reviewerName: 'Customer',
+          reviewerName: pickReviewerName(rev),
           rating: Number(rev.rating ?? 0),
           reviewText: rev.comment,
-          isVerified: true,
-          isMechanicReview: false,
+          isVerified: Boolean(rev.verified ?? rev.mechanicVerified),
+          isMechanicReview: Boolean(rev.mechanicReview ?? rev.isMechanicReview),
           date: formatDate(rev.createdAt),
         }));
         setCustomerReviews(apiReviews);
@@ -127,6 +165,59 @@ export default function ShopProfilePage() {
       cancelled = true;
     };
   }, [id]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function syncSavedState() {
+      if (!id || !shop?.id) return;
+      setSaveError('');
+      try {
+        await getCurrentUser();
+        if (cancelled) return;
+        setSaveAvailable(true);
+        const list = await listSavedShops();
+        if (cancelled) return;
+        const savedIds = new Set(
+          (list ?? [])
+            .map((row) => row.store?.id)
+            .filter(Boolean),
+        );
+        setIsSaved(savedIds.has(shop.id));
+      } catch {
+        if (!cancelled) {
+          setSaveAvailable(false);
+          setIsSaved(false);
+        }
+      }
+    }
+
+    syncSavedState();
+    return () => {
+      cancelled = true;
+    };
+  }, [id, shop?.id]);
+
+  async function handleToggleSave() {
+    if (!shop?.id || saveBusy || !saveAvailable) return;
+    setSaveBusy(true);
+    setSaveError('');
+    try {
+      if (isSaved) {
+        await unsaveShop(shop.id);
+        setIsSaved(false);
+      } else {
+        await saveShop(shop.id);
+        setIsSaved(true);
+      }
+    } catch (err) {
+      setSaveError(
+        err instanceof Error ? err.message : 'Could not update saved shops.',
+      );
+    } finally {
+      setSaveBusy(false);
+    }
+  }
 
   const hoursRows = useMemo(() => {
     if (!shop?.hours || typeof shop.hours !== 'object') {
@@ -216,6 +307,8 @@ export default function ShopProfilePage() {
 
   const fullStars = Math.floor(shop.rating ?? 0);
   const hasCoordinates = shop?.lat != null && shop?.lng != null;
+  const telDigits = digitsForTel(shop.phone);
+  const directionsUrl = buildGoogleMapsDirectionsUrl(shop);
 
   return (
     <>
@@ -253,7 +346,7 @@ export default function ShopProfilePage() {
                 </div>
                 <div className="d-flex align-items-center gap-2">
                   <LuPhone size={18} />
-                  <span>{shop.phone ?? '(555) 555-5555'}</span>
+                  <span>{shop.phone?.trim() ? shop.phone : 'Not provided'}</span>
                 </div>
                 <div className="d-flex align-items-center gap-2">
                   <LuClock size={18} />
@@ -265,18 +358,67 @@ export default function ShopProfilePage() {
             </div>
 
             <div className="d-flex flex-column gap-2">
-              <button type="button" className="btn btn-wt-primary">
-                Call Shop
-              </button>
-              <button type="button" className="btn btn-wt-orange">
-                Get Directions
-              </button>
+              {telDigits ? (
+                <a href={`tel:${telDigits}`} className="btn btn-wt-primary text-center text-decoration-none">
+                  Call Shop
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn-wt-primary"
+                  disabled
+                  title="No phone number on file for this shop"
+                >
+                  Call Shop
+                </button>
+              )}
+              {directionsUrl ? (
+                <a
+                  href={directionsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-wt-orange text-center text-decoration-none"
+                >
+                  Get Directions
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn-wt-orange"
+                  disabled
+                  title="Add an address or coordinates to open in Maps"
+                >
+                  Get Directions
+                </button>
+              )}
               <Link
                 to={`/write-review?storeId=${shop.id}`}
                 className="btn btn-sm btn-wt-outline text-center"
               >
                 Write Review
               </Link>
+              {saveAvailable && (
+                <button
+                  type="button"
+                  className={`btn btn-sm d-flex align-items-center justify-content-center gap-2 ${
+                    isSaved ? 'btn-wt-primary' : 'btn-wt-outline'
+                  }`}
+                  onClick={handleToggleSave}
+                  disabled={saveBusy}
+                  title={isSaved ? 'Remove from saved shops' : 'Save to your list'}
+                >
+                  <LuHeart
+                    size={16}
+                    style={isSaved ? { color: '#ffffff', fill: '#ffffff' } : undefined}
+                  />
+                  {saveBusy ? 'Saving…' : isSaved ? 'Saved' : 'Save shop'}
+                </button>
+              )}
+              {saveError && (
+                <p className="small mb-0" style={{ color: '#FF8C42' }}>
+                  {saveError}
+                </p>
+              )}
             </div>
           </div>
         </div>

@@ -8,8 +8,13 @@ export default function ShopCard({
   location,
   priceRange,
   services = [],
+  /** When backend adds these flags, badge shows; otherwise hidden (no fake “Verified”). */
+  verified,
+  hasVerifiedMechanic,
 }) {
   const topServices = services.slice(0, 3);
+  const showVerifiedBadge =
+    verified === true || hasVerifiedMechanic === true;
 
   return (
     <div className="wt-card h-100 d-flex flex-column">
@@ -28,7 +33,9 @@ export default function ShopCard({
 
       <div className="d-flex align-items-center justify-content-between mt-2 mb-3">
         <span className="wt-text-muted small">Price range: {priceRange}</span>
-        <span className="wt-badge-verified">Verified</span>
+        {showVerifiedBadge && (
+          <span className="wt-badge-verified">Verified</span>
+        )}
       </div>
 
       <div className="d-flex flex-wrap gap-2 mb-3">

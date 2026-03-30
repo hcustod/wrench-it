@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { LuStar, LuClock, LuCalendar, LuHeart } from 'react-icons/lu';
 import StatusBadge from '../components/common/StatusBadge.jsx';
-import { listSavedShops } from '../api/saved.js';
+import { listSavedShops, unsaveShop } from '../api/saved.js';
 import { getMyDashboard } from '../api/user.js';
 
 function formatDate(value) {
@@ -35,6 +35,7 @@ export default function UserDashboardPage() {
 
   const [dashboardError, setDashboardError] = useState('');
   const [savedError, setSavedError] = useState('');
+  const [unsavingId, setUnsavingId] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -124,6 +125,21 @@ export default function UserDashboardPage() {
     () => bookings.filter((b) => b.status === 'completed'),
     [bookings],
   );
+
+  async function handleUnsaveShop(shopId) {
+    setUnsavingId(shopId);
+    setSavedError('');
+    try {
+      await unsaveShop(shopId);
+      setSavedShops((prev) => prev.filter((s) => s.id !== shopId));
+    } catch (err) {
+      setSavedError(
+        err instanceof Error ? err.message : 'Could not remove shop from saved list.',
+      );
+    } finally {
+      setUnsavingId(null);
+    }
+  }
 
   return (
     <>
@@ -379,6 +395,10 @@ export default function UserDashboardPage() {
                       <button
                         type="button"
                         className="btn btn-sm btn-wt-outline d-flex align-items-center justify-content-center"
+                        onClick={() => handleUnsaveShop(shop.id)}
+                        disabled={unsavingId === shop.id}
+                        title="Remove from saved"
+                        aria-label="Remove from saved"
                       >
                         <LuHeart size={16} />
                       </button>
