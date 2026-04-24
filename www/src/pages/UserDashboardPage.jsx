@@ -561,7 +561,8 @@ export default function UserDashboardPage() {
                         className="btn btn-sm btn-wt-outline d-flex align-items-center justify-content-center"
                         onClick={() => handleUnsave(shop.id)}
                         disabled={removingSavedId === shop.id}
-                        title="Remove saved shop"
+                        title="Remove from saved"
+                        aria-label="Remove from saved"
                       >
                         <LuHeart size={16} />
                       </button>

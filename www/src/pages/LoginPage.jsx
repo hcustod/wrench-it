@@ -129,8 +129,15 @@ export default function LoginPage() {
                   className="form-check-input"
                   type="checkbox"
                   id="remember"
+                  disabled
+                  title="Not available in this release"
                 />
-                <label className="form-check-label wt-text-muted" htmlFor="remember">
+                <label
+                  className="form-check-label wt-text-muted"
+                  htmlFor="remember"
+                  style={{ opacity: 0.65 }}
+                  title="Not available in this release"
+                >
                   Remember me
                 </label>
               </div>

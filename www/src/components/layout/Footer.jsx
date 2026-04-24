@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { LuWrench } from 'react-icons/lu';
+import BrandMark from './BrandMark.jsx';
 
 export default function Footer() {
   return (

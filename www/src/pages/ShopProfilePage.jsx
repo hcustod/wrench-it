@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { LuArrowRight, LuClock, LuMapPin, LuPhone, LuShield, LuStar, LuX } from 'react-icons/lu';
 import { getStore, listStoreServices } from '../api/stores.js';
@@ -384,6 +384,32 @@ export default function ShopProfilePage() {
     shop,
   ]);
 
+  const handleToggleSaveShop = useCallback(async () => {
+    if (!shop?.id || savingShop) return;
+
+    setSavingShop(true);
+    setSaveMessage('');
+    try {
+      if (isSaved) {
+        await unsaveShop(shop.id);
+        setIsSaved(false);
+        setSaveMessage('Shop removed from saved list.');
+      } else {
+        await saveShop(shop.id);
+        setIsSaved(true);
+        setSaveMessage('Shop saved to your dashboard.');
+      }
+    } catch (err) {
+      if (err && typeof err === 'object' && 'status' in err && err.status === 401) {
+        setSaveMessage('Sign in to save shops.');
+      } else {
+        setSaveMessage(err instanceof Error ? err.message : 'Unable to update saved shop.');
+      }
+    } finally {
+      setSavingShop(false);
+    }
+  }, [shop, savingShop, isSaved]);
+
   if (loading && !shop) {
     return (
       <section className="mb-4">
@@ -413,32 +439,6 @@ export default function ShopProfilePage() {
   const aboutText = typeof shop.description === 'string' && shop.description.trim()
     ? shop.description.trim()
     : buildShopBlurb(shop, serviceHighlights);
-
-  async function handleToggleSaveShop() {
-    if (!shop?.id || savingShop) return;
-
-    setSavingShop(true);
-    setSaveMessage('');
-    try {
-      if (isSaved) {
-        await unsaveShop(shop.id);
-        setIsSaved(false);
-        setSaveMessage('Shop removed from saved list.');
-      } else {
-        await saveShop(shop.id);
-        setIsSaved(true);
-        setSaveMessage('Shop saved to your dashboard.');
-      }
-    } catch (err) {
-      if (err && typeof err === 'object' && 'status' in err && err.status === 401) {
-        setSaveMessage('Sign in to save shops.');
-      } else {
-        setSaveMessage(err instanceof Error ? err.message : 'Unable to update saved shop.');
-      }
-    } finally {
-      setSavingShop(false);
-    }
-  }
 
   return (
     <>
