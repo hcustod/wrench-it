@@ -16,7 +16,7 @@ const CATEGORIES = [
   'AC Repair',
 ];
 
-const DEFAULT_MAP_CENTER = { lat: 39.8283, lng: -98.5795 };
+const DEFAULT_MAP_CENTER = { lat: 43.6532, lng: -79.3832 };
 
 function resolveSearchSort(sortBy, hasCoords) {
   switch (sortBy) {
@@ -71,29 +71,102 @@ function normalizeStore(store) {
   };
 }
 
-function parseLocationFilters(locationText) {
-  const normalized = (locationText ?? '').trim();
-  if (!normalized) return { city: null, state: null };
+function extractCanadianPostalCode(value) {
+  const match = String(value ?? '').match(/[ABCEGHJ-NPRSTVXY]\d[ABCEGHJ-NPRSTV-Z][ -]?\d[ABCEGHJ-NPRSTV-Z]\d/i);
+  return match ? match[0].toUpperCase().replace(/\s+/, ' ') : '';
+}
 
-  const parts = normalized.split(',').map((part) => part.trim()).filter(Boolean);
-  if (parts.length >= 2) {
-    return {
-      city: parts[0],
-      state: parts[1],
-    };
+function buildLocationQueries(value) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return [];
+
+  const postalCode = extractCanadianPostalCode(raw);
+  const withoutPostal = postalCode
+    ? raw.replace(new RegExp(postalCode.replace(' ', '[ -]?'), 'i'), '').replace(/[,\s]+$/, '').trim()
+    : raw;
+
+  return Array.from(new Set([
+    raw,
+    `${raw}, Canada`,
+    `${raw}, Ontario, Canada`,
+    `${raw}, Toronto, ON, Canada`,
+    withoutPostal && postalCode ? `${withoutPostal}, Toronto, ON ${postalCode}, Canada` : '',
+    withoutPostal && postalCode ? `${withoutPostal}, ON ${postalCode}, Canada` : '',
+    postalCode ? `${postalCode}, Canada` : '',
+  ].filter(Boolean)));
+}
+
+async function resolvePlaceTextSearch(query) {
+  if (!window.google?.maps?.places?.PlacesService) return null;
+
+  const host = document.createElement('div');
+  const service = new window.google.maps.places.PlacesService(host);
+  const queries = Array.from(new Set([
+    query,
+    `${query}, Toronto`,
+    `${query}, Ontario`,
+    `${query}, Canada`,
+  ].filter(Boolean)));
+
+  for (const candidate of queries) {
+    const coords = await new Promise((resolve) => {
+      service.textSearch(
+        {
+          query: candidate,
+          region: 'ca',
+          location: new window.google.maps.LatLng(DEFAULT_MAP_CENTER.lat, DEFAULT_MAP_CENTER.lng),
+          radius: 100000,
+        },
+        (results, status) => {
+          if (status === window.google.maps.places.PlacesServiceStatus.OK
+            && Array.isArray(results)
+            && results[0]?.geometry?.location) {
+            const point = results[0].geometry.location;
+            resolve({ lat: point.lat(), lng: point.lng() });
+            return;
+          }
+          resolve(null);
+        },
+      );
+    });
+
+    if (coords) return coords;
   }
 
-  const token = parts[0];
-  if (!token) return { city: null, state: null };
-  if (/^[A-Za-z]{2,3}$/.test(token)) {
-    return { city: null, state: token.toUpperCase() };
+  return null;
+}
+
+async function resolveAddressGeocode(query) {
+  const geocoder = new window.google.maps.Geocoder();
+  const queries = buildLocationQueries(query);
+
+  for (const candidate of queries) {
+    const coords = await new Promise((resolve) => {
+      geocoder.geocode(
+        {
+          address: candidate,
+          region: 'ca',
+        },
+        (results, status) => {
+          if (status === 'OK' && Array.isArray(results) && results[0]?.geometry?.location) {
+            const point = results[0].geometry.location;
+            resolve({ lat: point.lat(), lng: point.lng() });
+            return;
+          }
+          resolve(null);
+        },
+      );
+    });
+
+    if (coords) return coords;
   }
-  return { city: token, state: null };
+
+  return null;
 }
 
 export default function SearchPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialLocation = searchParams.get('location') ?? 'Los Angeles, CA';
+  const initialLocation = searchParams.get('location') ?? '';
   const initialService = searchParams.get('service') ?? '';
 
   const [searchTerm, setSearchTerm] = useState(initialService);
@@ -114,6 +187,8 @@ export default function SearchPage() {
   const [error, setError] = useState('');
 
   const [userCoords, setUserCoords] = useState(null);
+  const [locationCoords, setLocationCoords] = useState(null);
+  const [locationLookup, setLocationLookup] = useState({ loading: false, query: '', error: '' });
   const [locating, setLocating] = useState(false);
 
   const [mapStatus, setMapStatus] = useState('');
@@ -126,12 +201,14 @@ export default function SearchPage() {
   const radiusCircleRef = useRef(null);
 
   const mapsApiKey = useMemo(() => resolveMapsApiKey(), []);
+  const activeCoords = userCoords || locationCoords;
 
   function handleTopSearch(e) {
     e.preventDefault();
     const trimmedLocation = location.trim();
     if (trimmedLocation.toLowerCase() !== 'current location') {
       setUserCoords(null);
+      setLocationCoords(null);
     }
     const next = new URLSearchParams();
     if (trimmedLocation) next.set('location', trimmedLocation);
@@ -171,6 +248,7 @@ export default function SearchPage() {
         lng: Number(position.coords.longitude),
       };
       setUserCoords(nextCoords);
+      setLocationCoords(null);
       setLocation('Current location');
     } catch {
       setError('Unable to access your location. Check browser permissions.');
@@ -187,10 +265,69 @@ export default function SearchPage() {
   }, [searchParams, userCoords]);
 
   useEffect(() => {
-    if (!userCoords && sortBy === 'closest') {
+    if (!activeCoords && sortBy === 'closest') {
       setSortBy('best');
     }
-  }, [sortBy, userCoords]);
+  }, [sortBy, activeCoords]);
+
+  useEffect(() => {
+    const qLocation = (searchParams.get('location') ?? '').trim();
+
+    if (!qLocation || qLocation.toLowerCase() === 'current location' || userCoords) {
+      setLocationLookup({ loading: false, query: qLocation, error: '' });
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    async function resolveLocation() {
+      setLocationLookup({ loading: true, query: qLocation, error: '' });
+      setLocationCoords(null);
+
+      if (!mapsApiKey) {
+        setLocationLookup({
+          loading: false,
+          query: qLocation,
+          error: 'Add a Google Maps key to search by address.',
+        });
+        return;
+      }
+
+      try {
+        await loadGoogleMaps(mapsApiKey);
+        if (cancelled) return;
+
+        const coords = await resolvePlaceTextSearch(qLocation) || await resolveAddressGeocode(qLocation);
+
+        if (cancelled) return;
+
+        if (!coords) {
+          setLocationLookup({
+            loading: false,
+            query: qLocation,
+            error: `Could not find "${qLocation}". Try adding the city, province, or postal code.`,
+          });
+          return;
+        }
+
+        setLocationCoords(coords);
+        setLocationLookup({ loading: false, query: qLocation, error: '' });
+      } catch {
+        if (!cancelled) {
+          setLocationLookup({
+            loading: false,
+            query: qLocation,
+            error: 'Could not load Google Maps geocoding. Check the Maps key and referrer restrictions.',
+          });
+        }
+      }
+    }
+
+    void resolveLocation();
+    return () => {
+      cancelled = true;
+    };
+  }, [searchParams, userCoords, mapsApiKey]);
 
   useEffect(() => {
     let cancelled = false;
@@ -201,18 +338,22 @@ export default function SearchPage() {
       try {
         const qService = searchParams.get('service') ?? '';
         const qLocation = (searchParams.get('location') ?? '').trim();
+        const needsAddressCoords = qLocation
+          && qLocation.toLowerCase() !== 'current location'
+          && !userCoords;
+
+        if (needsAddressCoords && !locationCoords) {
+          setStores([]);
+          setResultsTotal(0);
+          return;
+        }
+
+        const searchCoords = userCoords || locationCoords;
         const servicesParam = selectedCategory === 'all'
           ? undefined
           : selectedCategory.replaceAll('-', ' ');
-        const shouldUseLocationText = !userCoords
-          && qLocation
-          && qLocation.toLowerCase() !== 'current location';
-        const { city: cityParam, state: stateParam } = parseLocationFilters(qLocation);
-        // If the location looks like plain text instead of city/state filters, let the backend search against it directly.
-        const qParam = qService.trim() || (shouldUseLocationText && !cityParam && !stateParam
-          ? qLocation
-          : '');
-        const sortRequest = resolveSearchSort(sortBy, Boolean(userCoords));
+        const qParam = qService.trim();
+        const sortRequest = resolveSearchSort(sortBy, Boolean(searchCoords));
 
         const response = await searchStores({
           q: qParam,
@@ -226,11 +367,9 @@ export default function SearchPage() {
           ...(hasWebsite ? { hasWebsite: true } : {}),
           ...(hasPhone ? { hasPhone: true } : {}),
           ...(openNow ? { openNow: true } : {}),
-          ...(shouldUseLocationText && cityParam ? { city: cityParam } : {}),
-          ...(shouldUseLocationText && stateParam ? { state: stateParam } : {}),
-          ...(userCoords ? {
-            lat: userCoords.lat,
-            lng: userCoords.lng,
+          ...(searchCoords ? {
+            lat: searchCoords.lat,
+            lng: searchCoords.lng,
             radiusKm: distance * 1.60934,
           } : {}),
         });
@@ -260,7 +399,7 @@ export default function SearchPage() {
     return () => {
       cancelled = true;
     };
-  }, [searchParams, userCoords, distance, minRating, selectedCategory, priceRange, hasWebsite, hasPhone, openNow, sortBy]);
+  }, [searchParams, userCoords, locationCoords, locationLookup.error, distance, minRating, selectedCategory, priceRange, hasWebsite, hasPhone, openNow, sortBy]);
 
   useEffect(() => {
     let disposed = false;
@@ -275,11 +414,16 @@ export default function SearchPage() {
       setMapStatus('Loading map...');
       try {
         await loadGoogleMaps(mapsApiKey);
-        if (disposed || mapRef.current) return;
+        if (disposed) return;
+        if (mapRef.current) {
+          setMapReady(true);
+          setMapStatus('');
+          return;
+        }
 
         mapRef.current = new window.google.maps.Map(mapHostRef.current, {
-          center: userCoords || DEFAULT_MAP_CENTER,
-          zoom: userCoords ? 11 : 4,
+          center: activeCoords || DEFAULT_MAP_CENTER,
+          zoom: activeCoords ? 11 : 10,
           mapTypeControl: false,
           streetViewControl: false,
           fullscreenControl: true,
@@ -288,7 +432,7 @@ export default function SearchPage() {
         setMapStatus('');
       } catch {
         if (!disposed) {
-          setMapStatus('Could not load Google Maps API. Check key, billing, and localhost referrer restrictions.');
+          setMapStatus('Could not load Google Maps API. Check key, billing, and referrer restrictions.');
         }
       }
     }
@@ -297,7 +441,7 @@ export default function SearchPage() {
     return () => {
       disposed = true;
     };
-  }, [mapsApiKey, userCoords]);
+  }, [mapsApiKey, activeCoords]);
 
   const displayedStores = useMemo(
     () => stores.map((store) => {
@@ -305,19 +449,19 @@ export default function SearchPage() {
       const lat = store.lat ?? fallbackCoords?.lat ?? null;
       const lng = store.lng ?? fallbackCoords?.lng ?? null;
 
-      if (!userCoords || lat == null || lng == null) {
-        return { ...store, lat, lng, distanceMiles: userCoords && lat != null && lng != null
-          ? distanceMiles(userCoords.lat, userCoords.lng, lat, lng)
+      if (!activeCoords || lat == null || lng == null) {
+        return { ...store, lat, lng, distanceMiles: activeCoords && lat != null && lng != null
+          ? distanceMiles(activeCoords.lat, activeCoords.lng, lat, lng)
           : null };
       }
       return {
         ...store,
         lat,
         lng,
-        distanceMiles: distanceMiles(userCoords.lat, userCoords.lng, lat, lng),
+        distanceMiles: distanceMiles(activeCoords.lat, activeCoords.lng, lat, lng),
       };
     }),
-    [stores, userCoords, resolvedStoreCoords],
+    [stores, activeCoords, resolvedStoreCoords],
   );
 
   useEffect(() => {
@@ -403,11 +547,11 @@ export default function SearchPage() {
     const bounds = new window.google.maps.LatLngBounds();
     let markerCount = 0;
 
-    if (userCoords) {
+    if (activeCoords) {
       userMarkerRef.current = new window.google.maps.Marker({
         map: mapRef.current,
-        position: userCoords,
-        title: 'Your location',
+        position: activeCoords,
+        title: userCoords ? 'Your location' : locationLookup.query || 'Search location',
         icon: {
           path: window.google.maps.SymbolPath.CIRCLE,
           scale: 6,
@@ -420,7 +564,7 @@ export default function SearchPage() {
 
       radiusCircleRef.current = new window.google.maps.Circle({
         map: mapRef.current,
-        center: userCoords,
+        center: activeCoords,
         radius: distance * 1609.34,
         strokeColor: '#149488',
         strokeOpacity: 0.65,
@@ -428,7 +572,7 @@ export default function SearchPage() {
         fillColor: '#149488',
         fillOpacity: 0.12,
       });
-      bounds.extend(userCoords);
+      bounds.extend(activeCoords);
     }
 
     displayedStores.forEach((store) => {
@@ -444,16 +588,16 @@ export default function SearchPage() {
     });
 
     // Fit to whichever markers are available so the map still feels useful for both broad and local searches.
-    if (markerCount > 0 || userCoords) {
+    if (markerCount > 0 || activeCoords) {
       mapRef.current.fitBounds(bounds);
-      if (markerCount === 1 && !userCoords) {
+      if (markerCount === 1 && !activeCoords) {
         mapRef.current.setZoom(13);
       }
-      if (markerCount === 0 && userCoords) {
+      if (markerCount === 0 && activeCoords) {
         mapRef.current.setZoom(11);
       }
     }
-  }, [mapReady, displayedStores, userCoords, distance]);
+  }, [mapReady, displayedStores, activeCoords, userCoords, locationLookup.query, distance]);
 
   const resultsCount = displayedStores.length;
 
@@ -665,29 +809,26 @@ export default function SearchPage() {
                 <option value="rating">Highest Rated</option>
                 <option value="reviews">Most Reviews</option>
                 <option value="name">Name A-Z</option>
-                <option value="closest" disabled={!userCoords}>Closest</option>
+                <option value="closest" disabled={!activeCoords}>Closest</option>
               </select>
             </div>
 
             {loading && <p className="wt-text-muted small mb-2">Loading shops...</p>}
+            {locationLookup.loading && !loading && (
+              <p className="wt-text-muted small mb-2">Finding that location...</p>
+            )}
+            {locationLookup.error && !loading && (
+              <p className="small mb-2" style={{ color: 'var(--wt-accent-soft)' }}>
+                {locationLookup.error}
+              </p>
+            )}
             {error && !loading && (
               <p className="small mb-2" style={{ color: 'var(--wt-accent-soft)' }}>
                 {error}
               </p>
             )}
 
-            <div className="d-flex flex-column gap-3 mb-4">
-              {displayedStores.map((shop) => (
-                <ShopCard key={shop.id} {...shop} />
-              ))}
-              {!loading && !error && displayedStores.length === 0 && (
-                <p className="wt-text-muted small mb-0">
-                  No shops match your current filters.
-                </p>
-              )}
-            </div>
-
-            <div className="wt-card">
+            <div className="wt-card mb-4">
               <h3 className="h5 text-white mb-3">Map View</h3>
               <div style={{ position: 'relative' }}>
                 <div ref={mapHostRef} className="rounded-4" style={{ height: '24rem', width: '100%' }} />
@@ -704,6 +845,17 @@ export default function SearchPage() {
                   </div>
                 )}
               </div>
+            </div>
+
+            <div className="d-flex flex-column gap-3 mb-4">
+              {displayedStores.map((shop) => (
+                <ShopCard key={shop.id} {...shop} />
+              ))}
+              {!loading && !error && displayedStores.length === 0 && (
+                <p className="wt-text-muted small mb-0">
+                  No shops match your current filters.
+                </p>
+              )}
             </div>
           </div>
         </div>

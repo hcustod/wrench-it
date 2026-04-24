@@ -166,9 +166,16 @@ export default function RequestWorkOrderPage() {
                 {services.map((service) => (
                   <option key={service.id} value={service.id}>
                     {service.name}
+                    {typeof service.price === 'number' ? ` - $${service.price}` : ''}
                   </option>
                 ))}
               </select>
+              {serviceId && (
+                <div className="small wt-text-muted mt-2">
+                  {services.find((service) => service.id === serviceId)?.description
+                    || 'The shop will confirm details before the appointment.'}
+                </div>
+              )}
             </div>
 
             <div>

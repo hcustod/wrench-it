@@ -8,10 +8,10 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8082/realms/wrenchit}
-          jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://localhost:8082/realms/wrenchit/protocol/openid-connect/certs}
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:https://auth.wrenchit.app/realms/wrenchit}
+          jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://keycloak:8080/realms/wrenchit/protocol/openid-connect/certs}
   datasource:
-    url: jdbc:postgresql://${POSTGRES_APP_HOST:localhost}:${POSTGRES_APP_PORT:5432}/${POSTGRES_APP_DB:wrenchit_app}
+    url: jdbc:postgresql://${POSTGRES_APP_HOST:db_app}:${POSTGRES_APP_PORT:5432}/${POSTGRES_APP_DB:wrenchit_app}
     username: ${POSTGRES_APP_USER:wrenchit_app_user}
     password: ${POSTGRES_APP_PASSWORD}
   jpa:
@@ -40,8 +40,8 @@ wrenchit:
       same-site: ${WRENCHIT_SECURITY_COOKIE_SAME_SITE:Lax}
     keycloak:
       client-id: ${KEYCLOAK_CLIENT_ID:wrenchit-api-public}
-      issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8082/realms/wrenchit}
-      base-uri: ${KEYCLOAK_BASE_URL:${KEYCLOAK_ISSUER_URI:http://localhost:8082/realms/wrenchit}}
+      issuer-uri: ${KEYCLOAK_ISSUER_URI:https://auth.wrenchit.app/realms/wrenchit}
+      base-uri: ${KEYCLOAK_BASE_URL:${KEYCLOAK_ISSUER_URI:http://keycloak:8080/realms/wrenchit}}
       admin-username: ${KEYCLOAK_ADMIN_USERNAME:${KEYCLOAK_ADMIN:admin}}
       admin-password: ${KEYCLOAK_ADMIN_PASSWORD:}
       admin-realm: ${KEYCLOAK_ADMIN_REALM:master}
@@ -51,7 +51,7 @@ wrenchit:
   clamav:
     enabled: ${WRENCHIT_CLAMAV_ENABLED:false}
     fail-closed: ${WRENCHIT_CLAMAV_FAIL_CLOSED:false}
-    host: ${CLAMAV_HOST:localhost}
+    host: ${CLAMAV_HOST:clamav}
     port: ${CLAMAV_PORT:3310}
   google:
     enabled: ${WRENCHIT_GOOGLE_ENABLED:false}

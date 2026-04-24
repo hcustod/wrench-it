@@ -189,7 +189,7 @@ export default function ManageShopInfoPage() {
         setMapStatus('');
       } catch {
         if (!disposed) {
-          setMapStatus('Could not load Google Maps API. Check key, billing, and localhost referrer restrictions.');
+          setMapStatus('Could not load Google Maps API. Check key, billing, and referrer restrictions.');
         }
       }
     }

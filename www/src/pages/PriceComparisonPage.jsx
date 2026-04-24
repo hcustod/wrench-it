@@ -569,9 +569,9 @@ export default function PriceComparisonPage() {
                     <Link to={`/shop/${row.id}`} className="btn btn-wt-primary">
                       View Shop
                     </Link>
-                    <span className="wt-text-muted small">
-                      {isPinDisabled ? `Remove one pinned offer to add another.` : 'Pin to compare in columns.'}
-                    </span>
+                    {isPinDisabled && (
+                      <span className="wt-text-muted small">Remove one pinned offer to add another.</span>
+                    )}
                   </div>
                 </article>
               );

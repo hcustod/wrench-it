@@ -368,7 +368,7 @@ export default function ShopProfilePage() {
       } catch {
         if (!cancelled) {
           setResolvedCoords(null);
-          setMapStatus('Could not load Google Maps API. Check key, billing, and localhost referrer restrictions.');
+          setMapStatus('Could not load Google Maps API. Check key, billing, and referrer restrictions.');
         }
       }
     }
@@ -752,7 +752,14 @@ export default function ShopProfilePage() {
               <tbody>
                 {services.map((service) => (
                   <tr key={service.id}>
-                    <td>{service.name}</td>
+                    <td>
+                      <div className="d-flex flex-column gap-1">
+                        <span>{service.name}</span>
+                        {service.description && (
+                          <span className="wt-text-muted small">{service.description}</span>
+                        )}
+                      </div>
+                    </td>
                     <td>{typeof service.price === 'number' ? `$${service.price}` : 'Call'}</td>
                     <td>{service.duration ?? 'Unknown'}</td>
                     <td>

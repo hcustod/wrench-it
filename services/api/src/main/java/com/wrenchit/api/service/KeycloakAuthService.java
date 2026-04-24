@@ -42,6 +42,9 @@ public class KeycloakAuthService {
     private final String keycloakAdminRealm;
     private final String keycloakUserRole;
     private final String keycloakBaseUrl;
+    private final String forwardedProto;
+    private final String forwardedHost;
+    private final String forwardedPort;
     private final IssuerParts issuer;
 
     public KeycloakAuthService(
@@ -64,10 +67,13 @@ public class KeycloakAuthService {
         this.keycloakUserRole = keycloakUserRole;
         this.issuer = parseIssuer(keycloakIssuerUri);
         this.keycloakBaseUrl = resolveBaseUrl(keycloakBaseUri, issuer.baseUrl());
+        this.forwardedProto = issuer.scheme();
+        this.forwardedHost = issuer.authority();
+        this.forwardedPort = defaultPortForScheme(issuer.scheme());
     }
 
     public Map<String, Object> login(String email, String password) {
-        String normalizedEmail = normalizeEmail(email);
+        String normalizedLogin = normalizeLoginIdentifier(email);
         String normalizedPassword = normalizePassword(password);
 
         HttpResponse<String> response = postForm(
@@ -75,7 +81,7 @@ public class KeycloakAuthService {
                 Map.of(
                         "grant_type", "password",
                         "client_id", keycloakClientId,
-                        "username", normalizedEmail,
+                        "username", normalizedLogin,
                         "password", normalizedPassword
                 ),
                 null
@@ -363,6 +369,7 @@ public class KeycloakAuthService {
         HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(url))
                 .header("Content-Type", "application/x-www-form-urlencoded")
                 .POST(HttpRequest.BodyPublishers.ofString(body));
+        applyForwardedHeaders(builder);
         if (bearerToken != null && !bearerToken.isBlank()) {
             builder.header("Authorization", "Bearer " + bearerToken);
         }
@@ -375,6 +382,7 @@ public class KeycloakAuthService {
         HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(url))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(json));
+        applyForwardedHeaders(builder);
         if (bearerToken != null && !bearerToken.isBlank()) {
             builder.header("Authorization", "Bearer " + bearerToken);
         }
@@ -387,6 +395,7 @@ public class KeycloakAuthService {
         HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(url))
                 .header("Content-Type", "application/json")
                 .PUT(HttpRequest.BodyPublishers.ofString(json));
+        applyForwardedHeaders(builder);
         if (bearerToken != null && !bearerToken.isBlank()) {
             builder.header("Authorization", "Bearer " + bearerToken);
         }
@@ -397,6 +406,7 @@ public class KeycloakAuthService {
     private HttpResponse<String> getJson(String url, String bearerToken) {
         HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(url))
                 .GET();
+        applyForwardedHeaders(builder);
         if (bearerToken != null && !bearerToken.isBlank()) {
             builder.header("Authorization", "Bearer " + bearerToken);
         }
@@ -407,6 +417,7 @@ public class KeycloakAuthService {
     private HttpResponse<String> deleteJson(String url, String bearerToken) {
         HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(url))
                 .DELETE();
+        applyForwardedHeaders(builder);
         if (bearerToken != null && !bearerToken.isBlank()) {
             builder.header("Authorization", "Bearer " + bearerToken);
         }
@@ -478,6 +489,18 @@ public class KeycloakAuthService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email is required.");
         }
         return email;
+    }
+
+    private String normalizeLoginIdentifier(String value) {
+        if (value == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Username or email is required.");
+        }
+
+        String login = value.trim().toLowerCase(Locale.ROOT);
+        if (login.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Username or email is required.");
+        }
+        return login;
     }
 
     private String normalizePassword(String value) {
@@ -631,7 +654,7 @@ public class KeycloakAuthService {
             baseUrl.append(basePath);
         }
 
-        return new IssuerParts(baseUrl.toString(), realm);
+        return new IssuerParts(baseUrl.toString(), realm, uri.getScheme(), uri.getAuthority());
     }
 
     private String resolveBaseUrl(String configuredBaseUri, String fallbackBaseUrl) {
@@ -655,7 +678,31 @@ public class KeycloakAuthService {
         return candidate;
     }
 
-    private record IssuerParts(String baseUrl, String realm) {}
+    private void applyForwardedHeaders(HttpRequest.Builder builder) {
+        if (forwardedProto == null || forwardedProto.isBlank()
+                || forwardedHost == null || forwardedHost.isBlank()) {
+            return;
+        }
+
+        builder.header("X-Forwarded-Proto", forwardedProto)
+                .header("X-Forwarded-Host", forwardedHost);
+
+        if (forwardedPort != null && !forwardedPort.isBlank()) {
+            builder.header("X-Forwarded-Port", forwardedPort);
+        }
+    }
+
+    private String defaultPortForScheme(String scheme) {
+        if ("https".equalsIgnoreCase(scheme)) {
+            return "443";
+        }
+        if ("http".equalsIgnoreCase(scheme)) {
+            return "80";
+        }
+        return "";
+    }
+
+    private record IssuerParts(String baseUrl, String realm, String scheme, String authority) {}
 
     private record RegistrationProfile(
             String phone,

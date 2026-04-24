@@ -286,6 +286,7 @@ public class PortalDataService {
                 select
                   sv.id as service_id,
                   sv.name,
+                  sv.description,
                   sv.category,
                   ss.base_price_cents,
                   ss.duration_minutes
@@ -302,6 +303,7 @@ public class PortalDataService {
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("id", row.get("service_id"));
             item.put("name", row.get("name"));
+            item.put("description", row.get("description"));
             item.put("category", row.get("category"));
             item.put("price", centsToDollars(asInt(row.get("base_price_cents"))));
             item.put("duration", formatDuration(asInt(row.get("duration_minutes"))));
@@ -1827,6 +1829,7 @@ public class PortalDataService {
                 select
                   sv.id as service_id,
                   sv.name,
+                  sv.description,
                   sv.category,
                   ss.base_price_cents,
                   ss.duration_minutes
@@ -1847,6 +1850,7 @@ public class PortalDataService {
         Map<String, Object> item = new LinkedHashMap<>();
         item.put("id", row.get("service_id"));
         item.put("name", row.get("name"));
+        item.put("description", row.get("description"));
         item.put("category", row.get("category"));
         item.put("price", centsToDollars(asInt(row.get("base_price_cents"))));
         item.put("duration", formatDuration(asInt(row.get("duration_minutes"))));

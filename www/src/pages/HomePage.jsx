@@ -181,7 +181,7 @@ export default function HomePage() {
         setMapStatus('');
       } catch {
         if (!disposed) {
-          setMapStatus('Google Maps could not load. Check the API key and localhost referrer settings.');
+          setMapStatus('Google Maps could not load. Check the API key, billing, and referrer restrictions.');
         }
       }
     }

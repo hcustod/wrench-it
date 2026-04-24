@@ -76,15 +76,15 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit} noValidate className="d-flex flex-column gap-3">
             <div>
-              <label className="form-label text-white small mb-1">Email Address</label>
+              <label className="form-label text-white small mb-1">Username or Email</label>
               <div className="input-group">
                 <span className="input-group-text bg-transparent border-0">
                   <LuMail className="wt-text-muted" />
                 </span>
                 <input
-                  type="email"
+                  type="text"
                   className="form-control wt-input border-0"
-                  placeholder="you@example.com"
+                  placeholder="technik or you@example.com"
                   value={email}
                   onChange={(e) => {
                     setEmail(e.target.value);

@@ -53,7 +53,7 @@ services:
       KC_DB_USERNAME: ${POSTGRES_KC_USER:-keycloak_user}
       KC_DB_PASSWORD: ${POSTGRES_KC_PASSWORD:?Set POSTGRES_KC_PASSWORD in .env}
       KC_HTTP_PORT: "8080"
-      KC_HOSTNAME: ${KEYCLOAK_PUBLIC_HOSTNAME:-auth.localhost}
+      KC_HOSTNAME: ${KEYCLOAK_PUBLIC_HOSTNAME:-auth.wrenchit.app}
       KC_HOSTNAME_STRICT: "false"
       KC_HTTP_ENABLED: "true"
       KC_PROXY_HEADERS: "xforwarded"
@@ -99,7 +99,7 @@ services:
       CLAMAV_PORT: 3310
       KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-wrenchit-api-public}
       KEYCLOAK_BASE_URL: ${KEYCLOAK_INTERNAL_BASE_URL:-http://keycloak:8080}
-      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_ISSUER_URI:-https://auth.localhost/realms/wrenchit}
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_ISSUER_URI:-https://auth.wrenchit.app/realms/wrenchit}
       KEYCLOAK_JWK_SET_URI: ${KEYCLOAK_INTERNAL_JWK_SET_URI:-http://keycloak:8080/realms/wrenchit/protocol/openid-connect/certs}
       KEYCLOAK_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?Set KEYCLOAK_ADMIN_PASSWORD in .env}

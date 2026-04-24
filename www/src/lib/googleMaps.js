@@ -28,7 +28,7 @@ export async function loadGoogleMaps(apiKey) {
     // Reuse one shared loader promise so repeated map pages do not inject the script twice.
     window.__wrenchitGoogleMapsLoader = new Promise((resolve, reject) => {
       const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}`;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&libraries=places`;
       script.async = true;
       script.defer = true;
       script.onload = resolve;

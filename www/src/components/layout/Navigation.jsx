@@ -84,10 +84,12 @@ export default function Navigation() {
               <Link
                 to={dashboardPath}
                 className={isDashboardRoute ? 'wt-link-nav-active' : 'wt-link-nav'}
+                title="Dashboard"
+                aria-label="Dashboard"
               >
                 <span className="d-inline-flex align-items-center gap-2">
                   <LuUser size={16} />
-                  <span>Dashboard</span>
+                  {!session.user && <span>Dashboard</span>}
                 </span>
               </Link>
 
