@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LuWrench, LuUser, LuSearch, LuLogIn, LuLogOut } from 'react-icons/lu';
+import { LuUser, LuSearch, LuLogIn, LuLogOut } from 'react-icons/lu';
 import { getCurrentUser, logout, routeForRole } from '../../auth/keycloak.js';
+import BrandMark from './BrandMark.jsx';
 
 export default function Navigation() {
   const location = useLocation();
@@ -40,9 +41,9 @@ export default function Navigation() {
         className="container d-flex justify-content-between align-items-center"
         style={{ height: '4rem' }}
       >
-        <Link to="/" className="d-flex align-items-center gap-2 text-decoration-none">
-          <LuWrench size={24} style={{ color: '#6C63FF' }} />
-          <span className="fw-semibold text-white">WrenchIT</span>
+        <Link to="/" className="wt-brand-link d-flex align-items-center gap-2 text-decoration-none">
+          <BrandMark size={24} className="wt-brand-mark" />
+          <span className="wt-brand-wordmark fw-semibold text-white">WrenchIT</span>
         </Link>
 
         <div className="d-flex align-items-center gap-3 gap-md-4 flex-wrap justify-content-end">
