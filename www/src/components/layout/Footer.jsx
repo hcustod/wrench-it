@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { LuWrench } from 'react-icons/lu';
+import BrandMark from './BrandMark.jsx';
 
 export default function Footer() {
   return (
@@ -8,7 +8,7 @@ export default function Footer() {
         <div className="row g-4">
           <div className="col-12 col-md-4">
             <div className="d-flex align-items-center gap-2 mb-3">
-              <LuWrench size={20} style={{ color: '#6C63FF' }} />
+              <BrandMark size={20} className="wt-brand-mark" />
               <span className="text-white">WrenchIT</span>
             </div>
             <p className="wt-text-muted small mb-0">

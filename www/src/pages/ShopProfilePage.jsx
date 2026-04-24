@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { LuStar, LuMapPin, LuPhone, LuClock, LuArrowRight } from 'react-icons/lu';
 import { getStore, listStoreServices } from '../api/stores.js';
@@ -36,6 +36,20 @@ function formatHoursWindow(hours) {
   if (!open && !close) return null;
   if (open === 'Closed') return 'Closed';
   return close ? `${open} - ${close}` : open;
+}
+
+/** Backend may add reviewer display name later; until then show neutral label. */
+function pickReviewerName(rev) {
+  if (rev && typeof rev.reviewerName === 'string' && rev.reviewerName.trim()) {
+    return rev.reviewerName.trim();
+  }
+  if (rev && typeof rev.displayName === 'string' && rev.displayName.trim()) {
+    return rev.displayName.trim();
+  }
+  if (rev && typeof rev.authorName === 'string' && rev.authorName.trim()) {
+    return rev.authorName.trim();
+  }
+  return 'Member';
 }
 
 function resolveMapsApiKey() {
@@ -102,10 +116,7 @@ export default function ShopProfilePage() {
 
         const apiReviews = (reviewsRes ?? []).map((rev) => ({
           id: rev.id,
-          reviewerName:
-            typeof rev.reviewerName === 'string' && rev.reviewerName.trim()
-              ? rev.reviewerName
-              : 'Customer',
+          reviewerName: pickReviewerName(rev),
           rating: Number(rev.rating ?? 0),
           reviewText: rev.comment,
           ownerResponse: rev.ownerResponse ?? '',
@@ -277,6 +288,32 @@ export default function ShopProfilePage() {
     mapsApiKey,
   ]);
 
+  const handleToggleSaveShop = useCallback(async () => {
+    if (!shop?.id || savingShop) return;
+
+    setSavingShop(true);
+    setSaveMessage('');
+    try {
+      if (isSaved) {
+        await unsaveShop(shop.id);
+        setIsSaved(false);
+        setSaveMessage('Shop removed from saved list.');
+      } else {
+        await saveShop(shop.id);
+        setIsSaved(true);
+        setSaveMessage('Shop saved to your dashboard.');
+      }
+    } catch (err) {
+      if (err && typeof err === 'object' && 'status' in err && err.status === 401) {
+        setSaveMessage('Sign in to save shops.');
+      } else {
+        setSaveMessage(err instanceof Error ? err.message : 'Unable to update saved shop.');
+      }
+    } finally {
+      setSavingShop(false);
+    }
+  }, [shop, savingShop, isSaved]);
+
   if (loading && !shop) {
     return (
       <section className="mb-4">
@@ -304,32 +341,6 @@ export default function ShopProfilePage() {
   const directionsUrl = directionsTarget
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(directionsTarget)}`
     : '';
-
-  async function handleToggleSaveShop() {
-    if (!shop?.id || savingShop) return;
-
-    setSavingShop(true);
-    setSaveMessage('');
-    try {
-      if (isSaved) {
-        await unsaveShop(shop.id);
-        setIsSaved(false);
-        setSaveMessage('Shop removed from saved list.');
-      } else {
-        await saveShop(shop.id);
-        setIsSaved(true);
-        setSaveMessage('Shop saved to your dashboard.');
-      }
-    } catch (err) {
-      if (err && typeof err === 'object' && 'status' in err && err.status === 401) {
-        setSaveMessage('Sign in to save shops.');
-      } else {
-        setSaveMessage(err instanceof Error ? err.message : 'Unable to update saved shop.');
-      }
-    } finally {
-      setSavingShop(false);
-    }
-  }
 
   return (
     <>
@@ -367,7 +378,7 @@ export default function ShopProfilePage() {
                 </div>
                 <div className="d-flex align-items-center gap-2">
                   <LuPhone size={18} />
-                  <span>{shop.phone ?? '(555) 555-5555'}</span>
+                  <span>{shop.phone?.trim() ? shop.phone : 'Not provided'}</span>
                 </div>
                 <div className="d-flex align-items-center gap-2">
                   <LuClock size={18} />
@@ -386,11 +397,19 @@ export default function ShopProfilePage() {
                 Request Work Order
               </Link>
               {dialPhone ? (
-                <a href={`tel:${dialPhone}`} className="btn btn-wt-orange text-center">
+                <a
+                  href={`tel:${dialPhone}`}
+                  className="btn btn-wt-orange text-center text-decoration-none"
+                >
                   Call Shop
                 </a>
               ) : (
-                <button type="button" className="btn btn-wt-orange" disabled>
+                <button
+                  type="button"
+                  className="btn btn-wt-orange"
+                  disabled
+                  title="No phone number on file for this shop"
+                >
                   Call Shop
                 </button>
               )}
@@ -398,13 +417,18 @@ export default function ShopProfilePage() {
                 <a
                   href={directionsUrl}
                   target="_blank"
-                  rel="noreferrer"
-                  className="btn btn-wt-outline text-center"
+                  rel="noopener noreferrer"
+                  className="btn btn-wt-outline text-center text-decoration-none"
                 >
                   Get Directions
                 </a>
               ) : (
-                <button type="button" className="btn btn-wt-outline" disabled>
+                <button
+                  type="button"
+                  className="btn btn-wt-outline"
+                  disabled
+                  title="Add an address or coordinates to open in Maps"
+                >
                   Get Directions
                 </button>
               )}

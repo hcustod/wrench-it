@@ -28,7 +28,22 @@ export default function ProtectedRoute({ children, roles = [] }) {
   }, []);
 
   if (state.loading) {
-    return null;
+    return (
+      <div
+        className="d-flex justify-content-center align-items-center py-5 px-3"
+        style={{ minHeight: '45vh' }}
+      >
+        <div className="text-center">
+          <div
+            className="spinner-border mb-3"
+            role="status"
+            aria-label="Loading"
+            style={{ width: '2.5rem', height: '2.5rem', color: '#6C63FF' }}
+          />
+          <p className="wt-text-muted small mb-0">Checking your session…</p>
+        </div>
+      </div>
+    );
   }
 
   if (!state.user) {
