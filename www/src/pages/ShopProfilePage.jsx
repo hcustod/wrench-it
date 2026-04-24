@@ -177,6 +177,15 @@ export default function ShopProfilePage() {
       .filter((item) => item.value);
   }, [shop]);
 
+  const fallbackServiceTags = useMemo(
+    () =>
+      String(shop?.servicesText || '')
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean),
+    [shop?.servicesText],
+  );
+
   useEffect(() => {
     setResolvedCoords(null);
   }, [shop?.id, shop?.lat, shop?.lng, shop?.address, shop?.city, shop?.state, shop?.postalCode, shop?.country]);
@@ -367,7 +376,7 @@ export default function ShopProfilePage() {
                 </div>
                 <div className="d-flex align-items-center gap-2">
                   <LuPhone size={18} />
-                  <span>{shop.phone ?? '(555) 555-5555'}</span>
+                  <span>{shop.phone ?? 'Phone unavailable'}</span>
                 </div>
                 <div className="d-flex align-items-center gap-2">
                   <LuClock size={18} />
@@ -646,6 +655,21 @@ export default function ShopProfilePage() {
                     </tbody>
                   </table>
                 </div>
+
+                {services.length === 0 && fallbackServiceTags.length > 0 && (
+                  <div className="mt-3">
+                    <p className="wt-text-muted small mb-2">
+                      Service highlights from the shop listing
+                    </p>
+                    <div className="d-flex flex-wrap gap-2">
+                      {fallbackServiceTags.map((service) => (
+                        <span key={service} className="wt-chip-service">
+                          {service}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

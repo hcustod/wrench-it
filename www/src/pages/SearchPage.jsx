@@ -144,6 +144,7 @@ export default function SearchPage() {
 
   const [mapStatus, setMapStatus] = useState('');
   const [mapReady, setMapReady] = useState(false);
+  const [resolvedStoreCoords, setResolvedStoreCoords] = useState({});
   const mapHostRef = useRef(null);
   const mapRef = useRef(null);
   const mapMarkersRef = useRef([]);
@@ -325,16 +326,89 @@ export default function SearchPage() {
 
   const displayedStores = useMemo(
     () => stores.map((store) => {
-      if (!userCoords || store.lat == null || store.lng == null) {
-        return { ...store, distanceMiles: null };
+      const fallbackCoords = resolvedStoreCoords[store.id];
+      const lat = store.lat ?? fallbackCoords?.lat ?? null;
+      const lng = store.lng ?? fallbackCoords?.lng ?? null;
+
+      if (!userCoords || lat == null || lng == null) {
+        return { ...store, lat, lng, distanceMiles: userCoords && lat != null && lng != null
+          ? distanceMiles(userCoords.lat, userCoords.lng, lat, lng)
+          : null };
       }
       return {
         ...store,
-        distanceMiles: distanceMiles(userCoords.lat, userCoords.lng, store.lat, store.lng),
+        lat,
+        lng,
+        distanceMiles: distanceMiles(userCoords.lat, userCoords.lng, lat, lng),
       };
     }),
-    [stores, userCoords],
+    [stores, userCoords, resolvedStoreCoords],
   );
+
+  useEffect(() => {
+    if (!mapReady || !window.google?.maps) return;
+
+    const missingCoords = displayedStores.filter((store) => {
+      if (!store?.id) return false;
+      if (store.lat != null && store.lng != null) return false;
+
+      const address = [
+        store.address,
+        store.city,
+        store.state,
+        store.postalCode,
+        store.country,
+      ].filter(Boolean).join(', ');
+      return Boolean(address);
+    });
+
+    if (missingCoords.length === 0) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    const geocoder = new window.google.maps.Geocoder();
+
+    async function resolveMissingCoords() {
+      for (const store of missingCoords) {
+        const address = [
+          store.address,
+          store.city,
+          store.state,
+          store.postalCode,
+          store.country,
+        ].filter(Boolean).join(', ');
+
+        const coords = await new Promise((resolve) => {
+          geocoder.geocode({ address }, (results, status) => {
+            if (status === 'OK' && Array.isArray(results) && results[0]?.geometry?.location) {
+              const point = results[0].geometry.location;
+              resolve({ lat: point.lat(), lng: point.lng() });
+              return;
+            }
+            resolve(null);
+          });
+        });
+
+        if (cancelled || !coords) {
+          if (cancelled) return;
+          continue;
+        }
+
+        setResolvedStoreCoords((current) => (
+          current[store.id]
+            ? current
+            : { ...current, [store.id]: coords }
+        ));
+      }
+    }
+
+    void resolveMissingCoords();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [displayedStores, mapReady]);
 
   useEffect(() => {
     if (!mapReady || !mapRef.current || !window.google?.maps) return;
