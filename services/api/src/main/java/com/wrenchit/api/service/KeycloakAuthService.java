@@ -41,6 +41,7 @@ public class KeycloakAuthService {
     private final String keycloakAdminPassword;
     private final String keycloakAdminRealm;
     private final String keycloakUserRole;
+    private final String keycloakBaseUrl;
     private final IssuerParts issuer;
 
     public KeycloakAuthService(
@@ -48,6 +49,7 @@ public class KeycloakAuthService {
             UserService userService,
             @Value("${wrenchit.security.keycloak.client-id}") String keycloakClientId,
             @Value("${wrenchit.security.keycloak.issuer-uri}") String keycloakIssuerUri,
+            @Value("${wrenchit.security.keycloak.base-uri:}") String keycloakBaseUri,
             @Value("${wrenchit.security.keycloak.admin-username:}") String keycloakAdminUsername,
             @Value("${wrenchit.security.keycloak.admin-password:}") String keycloakAdminPassword,
             @Value("${wrenchit.security.keycloak.admin-realm:master}") String keycloakAdminRealm,
@@ -61,6 +63,7 @@ public class KeycloakAuthService {
         this.keycloakAdminRealm = keycloakAdminRealm;
         this.keycloakUserRole = keycloakUserRole;
         this.issuer = parseIssuer(keycloakIssuerUri);
+        this.keycloakBaseUrl = resolveBaseUrl(keycloakBaseUri, issuer.baseUrl());
     }
 
     public Map<String, Object> login(String email, String password) {
@@ -106,6 +109,7 @@ public class KeycloakAuthService {
             userId = createKeycloakUser(adminToken, email, password, displayName);
             assignRealmRole(adminToken, userId, keycloakUserRole);
             if (!keycloakUserRole.equalsIgnoreCase(appRole)) {
+                // Keep the shared app role, then layer the portal-specific role on top when needed.
                 assignRealmRole(adminToken, userId, appRole);
             }
             userService.upsertRegisteredUser(
@@ -121,6 +125,7 @@ public class KeycloakAuthService {
             );
         } catch (RuntimeException ex) {
             if (userId != null) {
+                // Roll back the Keycloak record if the local profile write fails halfway through registration.
                 rollbackKeycloakUserQuietly(adminToken, userId);
             }
             throw ex;
@@ -327,6 +332,7 @@ public class KeycloakAuthService {
     private Optional<String> extractUserIdFromLocation(HttpResponse<String> response) {
         return response.headers().firstValue("Location")
                 .flatMap(location -> {
+                    // Keycloak usually returns the new user id in the Location header, which saves a second lookup.
                     int idx = location.lastIndexOf('/');
                     if (idx < 0 || idx == location.length() - 1) {
                         return Optional.empty();
@@ -337,11 +343,11 @@ public class KeycloakAuthService {
     }
 
     private String tokenEndpointForRealm(String realm) {
-        return issuer.baseUrl + "/realms/" + realm + "/protocol/openid-connect/token";
+        return keycloakBaseUrl + "/realms/" + realm + "/protocol/openid-connect/token";
     }
 
     private String adminRealmEndpoint() {
-        return issuer.baseUrl + "/admin/realms/" + issuer.realm;
+        return keycloakBaseUrl + "/admin/realms/" + issuer.realm;
     }
 
     private String adminUsersEndpoint() {
@@ -415,6 +421,7 @@ public class KeycloakAuthService {
             Thread.currentThread().interrupt();
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Keycloak request interrupted.");
         } catch (IOException ex) {
+            // Surface a clean gateway-style error instead of leaking low-level HTTP client details.
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Unable to reach Keycloak.");
         }
     }
@@ -513,6 +520,7 @@ public class KeycloakAuthService {
         String shopName = normalizeOptional(request.shopName);
         String businessLicense = normalizeOptional(request.businessLicense);
 
+        // Mechanic and shop-owner accounts need a little more profile data because the portal surfaces it later.
         boolean proRole = "MECHANIC".equals(appRole) || "SHOP_OWNER".equals(appRole);
         if (proRole && phone == null) {
             throw new ResponseStatusException(
@@ -624,6 +632,27 @@ public class KeycloakAuthService {
         }
 
         return new IssuerParts(baseUrl.toString(), realm);
+    }
+
+    private String resolveBaseUrl(String configuredBaseUri, String fallbackBaseUrl) {
+        String candidate = configuredBaseUri == null || configuredBaseUri.isBlank()
+                ? fallbackBaseUrl
+                : configuredBaseUri.trim();
+
+        int realmsIndex = candidate.indexOf("/realms/");
+        if (realmsIndex >= 0) {
+            candidate = candidate.substring(0, realmsIndex);
+        }
+
+        while (candidate.endsWith("/")) {
+            candidate = candidate.substring(0, candidate.length() - 1);
+        }
+
+        if (candidate.isBlank()) {
+            throw new IllegalStateException("Keycloak base URL is not configured.");
+        }
+
+        return candidate;
     }
 
     private record IssuerParts(String baseUrl, String realm) {}

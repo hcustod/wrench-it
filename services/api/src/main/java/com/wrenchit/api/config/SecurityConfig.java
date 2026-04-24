@@ -28,6 +28,7 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable());
 
         if (!authEnabled) {
+            // Useful for local development when the rest of the stack is still being wired up.
             http.authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
             return http.build();
         }
@@ -58,10 +59,12 @@ public class SecurityConfig {
     private BearerTokenResolver bearerTokenResolver() {
         DefaultBearerTokenResolver headerResolver = new DefaultBearerTokenResolver();
         return request -> {
+            // Keep the standard bearer flow first so scripts and API tools behave normally.
             String bearer = headerResolver.resolve(request);
             if (bearer != null && !bearer.isBlank()) {
                 return bearer;
             }
+            // Browser requests rely on the access token cookie instead of an Authorization header.
             return resolveFromCookie(request);
         };
     }

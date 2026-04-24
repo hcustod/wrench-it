@@ -55,6 +55,7 @@ public class ReviewController {
                                  @Validated @RequestBody ReviewRequest request) {
         assertStoreExists(storeId);
         var user = userService.getOrCreateFromJwt(jwt);
+        // Make sure any linked receipt/work order actually belongs to this user and this store before saving the review.
         PortalDataService.ReviewReferenceResolution reviewContext = portalDataService.validateReviewReferences(
                 storeId,
                 user.getId(),
@@ -98,6 +99,7 @@ public class ReviewController {
 
     private ReviewResponse toResponse(java.util.Map<String, Object> row) {
         ReviewResponse res = new ReviewResponse();
+        // Dashboard queries already join reply and verification details, so map the richer row shape here.
         res.id = (UUID) row.get("id");
         res.storeId = (UUID) row.get("storeId");
         res.userId = (UUID) row.get("userId");

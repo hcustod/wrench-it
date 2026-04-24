@@ -61,6 +61,7 @@ public class MechanicController {
     public Map<String, Object> decide(@PathVariable UUID id,
                                       @AuthenticationPrincipal Jwt jwt,
                                       @Validated @RequestBody ReceiptDecisionRequest request) {
+        // Mechanics share the same moderation action as admins, but the role gate is different.
         var user = userService.requireAppRole(jwt, "MECHANIC");
         return portalDataService.decideReceipt(id, user.getId(), request.result, request.notes);
     }

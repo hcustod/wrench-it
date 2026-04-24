@@ -165,9 +165,9 @@ export default function AdminReviewPage() {
           style={{
             padding: '0.75rem 1rem',
             borderRadius: 12,
-            backgroundColor: 'rgba(239,68,68,0.12)',
-            border: '1px solid rgba(239,68,68,0.45)',
-            color: '#f87171',
+            backgroundColor: 'var(--wt-danger-bg)',
+            border: '1px solid var(--wt-danger-border)',
+            color: 'var(--wt-danger)',
           }}
         >
           <LuCircleAlert size={18} style={{ flexShrink: 0 }} />
@@ -181,8 +181,8 @@ export default function AdminReviewPage() {
           style={{
             padding: '0.75rem 1rem',
             borderRadius: 12,
-            backgroundColor: 'rgba(108,99,255,0.1)',
-            border: '1px solid rgba(108,99,255,0.4)',
+            backgroundColor: 'var(--wt-accent-bg)',
+            border: '1px solid var(--wt-accent-border)',
           }}
         >
           <LuCircleAlert size={18} style={{ flexShrink: 0 }} />
@@ -195,7 +195,7 @@ export default function AdminReviewPage() {
           <div className="col-12 col-lg-6">
             <div className="wt-card">
               <div className="d-flex align-items-center gap-2 mb-3">
-                <LuFileText size={18} style={{ color: '#FF8C42' }} />
+                <LuFileText size={18} style={{ color: 'var(--wt-accent-soft)' }} />
                 <h2 className="h6 text-white mb-0">Customer Review</h2>
               </div>
 
@@ -225,8 +225,8 @@ export default function AdminReviewPage() {
                         size={18}
                         style={
                           idx < (review.rating ?? 0)
-                            ? { color: '#FF8C42', fill: '#FF8C42' }
-                            : { color: '#3A3652' }
+                            ? { color: 'var(--wt-warning)', fill: 'var(--wt-warning)' }
+                            : { color: 'var(--wt-border-strong)' }
                         }
                       />
                     ))}
@@ -236,7 +236,7 @@ export default function AdminReviewPage() {
                   <div className="text-white mb-1">Review Text</div>
                   <div
                     className="rounded-4 p-3"
-                    style={{ backgroundColor: '#2A2740', border: '1px solid #3A3652' }}
+                    style={{ backgroundColor: 'var(--wt-bg-surface-strong)', border: '1px solid var(--wt-border-strong)' }}
                   >
                     <p className="mb-0 text-white">{review.reviewText}</p>
                   </div>
@@ -248,7 +248,7 @@ export default function AdminReviewPage() {
           <div className="col-12 col-lg-6 d-flex flex-column gap-4">
             <div className="wt-card">
               <div className="d-flex align-items-center gap-2 mb-3">
-                <LuFileText size={18} style={{ color: '#FF8C42' }} />
+                <LuFileText size={18} style={{ color: 'var(--wt-accent-soft)' }} />
                 <h2 className="h6 text-white mb-0">Receipt Preview</h2>
               </div>
 
@@ -257,8 +257,8 @@ export default function AdminReviewPage() {
                   <div
                     className="rounded-4 d-flex align-items-center justify-content-center overflow-hidden"
                     style={{
-                      backgroundColor: '#2A2740',
-                      border: '2px dashed #3A3652',
+                      backgroundColor: 'var(--wt-bg-surface-strong)',
+                      border: '2px dashed var(--wt-border-strong)',
                       height: '14rem',
                     }}
                   >
@@ -281,7 +281,7 @@ export default function AdminReviewPage() {
                         <LuFileText size={40} className="mb-2" />
                         <div>{review.receiptDetails?.fileName ?? 'Receipt file'}</div>
                         {previewError ? (
-                          <div className="small" style={{ color: '#FF8C42' }}>{previewError}</div>
+                          <div className="small" style={{ color: 'var(--wt-accent-soft)' }}>{previewError}</div>
                         ) : (
                           <div className="small">Preview unavailable for this file type.</div>
                         )}
@@ -292,8 +292,8 @@ export default function AdminReviewPage() {
                   <div
                     className="rounded-4 p-3"
                     style={{
-                      backgroundColor: 'rgba(255,140,66,0.1)',
-                      border: '1px solid rgba(255,140,66,0.3)',
+                      backgroundColor: 'var(--wt-accent-bg)',
+                      border: '1px solid var(--wt-accent-border)',
                     }}
                   >
                     <div className="text-white mb-2">Receipt Details</div>
@@ -317,7 +317,7 @@ export default function AdminReviewPage() {
                             href={previewUrl}
                             target="_blank"
                             rel="noreferrer"
-                            style={{ color: '#FF8C42' }}
+                            style={{ color: 'var(--wt-accent-soft)' }}
                           >
                             Open receipt
                           </a>
@@ -329,7 +329,7 @@ export default function AdminReviewPage() {
               ) : (
                 <div
                   className="rounded-4 p-4 text-center"
-                  style={{ backgroundColor: '#2A2740', border: '1px solid #3A3652' }}
+                  style={{ backgroundColor: 'var(--wt-bg-surface-strong)', border: '1px solid var(--wt-border-strong)' }}
                 >
                   <LuFileText size={32} className="wt-text-muted mb-2" />
                   <p className="wt-text-muted mb-1">No receipt uploaded.</p>
@@ -351,10 +351,10 @@ export default function AdminReviewPage() {
                   className="form-control"
                   rows={3}
                   style={{
-                    backgroundColor: '#2A2740',
-                    border: '1px solid #3A3652',
+                    backgroundColor: 'var(--wt-bg-surface-strong)',
+                    border: '1px solid var(--wt-border-strong)',
                     borderRadius: 12,
-                    color: '#ffffff',
+                    color: 'var(--wt-text)',
                     resize: 'none',
                     fontSize: '0.95rem',
                   }}
@@ -368,7 +368,7 @@ export default function AdminReviewPage() {
                 <button
                   type="button"
                   className="btn d-flex justify-content-center align-items-center gap-2"
-                  style={{ backgroundColor: '#16a34a', color: '#ffffff' }}
+                  style={{ backgroundColor: 'var(--wt-success)', color: 'var(--wt-bg-deep)' }}
                   onClick={() => handleDecision('APPROVED')}
                   disabled={submitting}
                 >
@@ -378,7 +378,7 @@ export default function AdminReviewPage() {
                 <button
                   type="button"
                   className="btn d-flex justify-content-center align-items-center gap-2"
-                  style={{ backgroundColor: '#FF8C42', color: '#ffffff' }}
+                  style={{ backgroundColor: 'var(--wt-accent)', color: 'var(--wt-text)' }}
                   onClick={() => handleDecision('NEEDS_INFO')}
                   disabled={submitting}
                 >
@@ -390,8 +390,8 @@ export default function AdminReviewPage() {
                   className="btn d-flex justify-content-center align-items-center gap-2"
                   style={{
                     backgroundColor: 'transparent',
-                    border: '1px solid #d32f2f',
-                    color: '#ef4444',
+                    border: '1px solid var(--wt-danger-border)',
+                    color: 'var(--wt-danger)',
                   }}
                   onClick={() => handleDecision('REJECTED')}
                   disabled={submitting}

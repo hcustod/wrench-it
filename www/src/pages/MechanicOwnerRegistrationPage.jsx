@@ -83,7 +83,7 @@ export default function MechanicOwnerRegistrationPage() {
 
         <div className="wt-card">
           {error && (
-            <div className="mb-3 small" style={{ color: '#FF8C42' }}>
+            <div className="mb-3 small" style={{ color: 'var(--wt-accent-soft)' }}>
               {error}
             </div>
           )}
@@ -96,7 +96,7 @@ export default function MechanicOwnerRegistrationPage() {
           
           <div
             className="mb-3 rounded-4 p-3"
-            style={{ backgroundColor: '#2A2740', border: '2px solid rgba(255,140,66,0.3)' }}
+            style={{ backgroundColor: 'var(--wt-bg-surface-strong)', border: '2px solid var(--wt-accent-border)' }}
           >
             <div className="text-white small mb-2">I am registering as: *</div>
             <div className="row g-2">
@@ -104,8 +104,8 @@ export default function MechanicOwnerRegistrationPage() {
                 <label
                   className="d-flex align-items-center gap-2 rounded-4 p-3"
                   style={{
-                    backgroundColor: '#242133',
-                    border: `2px solid ${!isMechanic ? '#FF8C42' : '#3A3652'}`,
+                    backgroundColor: 'var(--wt-bg-surface)',
+                    border: `2px solid ${!isMechanic ? 'var(--wt-accent-soft)' : 'var(--wt-border-strong)'}`,
                     cursor: 'pointer',
                   }}
                 >
@@ -127,8 +127,8 @@ export default function MechanicOwnerRegistrationPage() {
                 <label
                   className="d-flex align-items-center gap-2 rounded-4 p-3"
                   style={{
-                    backgroundColor: '#242133',
-                    border: `2px solid ${isMechanic ? '#FF8C42' : '#3A3652'}`,
+                    backgroundColor: 'var(--wt-bg-surface)',
+                    border: `2px solid ${isMechanic ? 'var(--wt-accent-soft)' : 'var(--wt-border-strong)'}`,
                     cursor: 'pointer',
                   }}
                 >
@@ -166,7 +166,7 @@ export default function MechanicOwnerRegistrationPage() {
                 />
               </div>
               {fieldErrors.fullName && (
-                <div className="small mt-1" style={{ color: '#FF8C42' }}>
+                <div className="small mt-1" style={{ color: 'var(--wt-accent-soft)' }}>
                   {fieldErrors.fullName}
                 </div>
               )}
@@ -187,7 +187,7 @@ export default function MechanicOwnerRegistrationPage() {
                 />
               </div>
               {fieldErrors.email && (
-                <div className="small mt-1" style={{ color: '#FF8C42' }}>
+                <div className="small mt-1" style={{ color: 'var(--wt-accent-soft)' }}>
                   {fieldErrors.email}
                 </div>
               )}
@@ -209,7 +209,7 @@ export default function MechanicOwnerRegistrationPage() {
                 />
               </div>
               {fieldErrors.phone && (
-                <div className="small mt-1" style={{ color: '#FF8C42' }}>
+                <div className="small mt-1" style={{ color: 'var(--wt-accent-soft)' }}>
                   {fieldErrors.phone}
                 </div>
               )}
@@ -231,7 +231,7 @@ export default function MechanicOwnerRegistrationPage() {
                   />
                 </div>
                 {fieldErrors.password && (
-                  <div className="small mt-1" style={{ color: '#FF8C42' }}>
+                  <div className="small mt-1" style={{ color: 'var(--wt-accent-soft)' }}>
                     {fieldErrors.password}
                   </div>
                 )}
@@ -251,7 +251,7 @@ export default function MechanicOwnerRegistrationPage() {
                   />
                 </div>
                 {error && (
-                  <div className="small mt-1" style={{ color: '#FF8C42' }}>
+                  <div className="small mt-1" style={{ color: 'var(--wt-accent-soft)' }}>
                     {error}
                   </div>
                 )}
@@ -273,7 +273,7 @@ export default function MechanicOwnerRegistrationPage() {
                     onChange={(e) => handleChange('certificationNumber', e.target.value)}
                   />
                   {fieldErrors.certificationNumber && (
-                    <div className="small mt-1" style={{ color: '#FF8C42' }}>
+                    <div className="small mt-1" style={{ color: 'var(--wt-accent-soft)' }}>
                       {fieldErrors.certificationNumber}
                     </div>
                   )}
@@ -291,7 +291,7 @@ export default function MechanicOwnerRegistrationPage() {
                     onChange={(e) => handleChange('yearsExperience', e.target.value)}
                   />
                   {fieldErrors.yearsExperience && (
-                    <div className="small mt-1" style={{ color: '#FF8C42' }}>
+                    <div className="small mt-1" style={{ color: 'var(--wt-accent-soft)' }}>
                       {fieldErrors.yearsExperience}
                     </div>
                   )}
@@ -310,7 +310,7 @@ export default function MechanicOwnerRegistrationPage() {
                     required={!isMechanic}
                   />
                   {fieldErrors.shopName && (
-                    <div className="small mt-1" style={{ color: '#FF8C42' }}>
+                    <div className="small mt-1" style={{ color: 'var(--wt-accent-soft)' }}>
                       {fieldErrors.shopName}
                     </div>
                   )}
@@ -327,7 +327,7 @@ export default function MechanicOwnerRegistrationPage() {
                     onChange={(e) => handleChange('businessLicense', e.target.value)}
                   />
                   {fieldErrors.businessLicense && (
-                    <div className="small mt-1" style={{ color: '#FF8C42' }}>
+                    <div className="small mt-1" style={{ color: 'var(--wt-accent-soft)' }}>
                       {fieldErrors.businessLicense}
                     </div>
                   )}
@@ -338,8 +338,8 @@ export default function MechanicOwnerRegistrationPage() {
             <div
               className="rounded-4 p-3 small"
               style={{
-                backgroundColor: 'rgba(108,99,255,0.1)',
-                border: '1px solid rgba(108,99,255,0.4)',
+                backgroundColor: 'var(--wt-accent-bg)',
+                border: '1px solid var(--wt-accent-border)',
               }}
             >
               <label className="d-flex align-items-start gap-2">

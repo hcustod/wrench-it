@@ -9,6 +9,7 @@ export function submitReview(storeId, payload) {
     rating: payload.rating,
     comment: payload.comment,
   };
+  // Only attach linkage fields that exist for this visit so the endpoint can validate them selectively.
   if (payload.serviceId) body.serviceId = payload.serviceId;
   if (payload.receiptId) body.receiptId = payload.receiptId;
   if (payload.workOrderId) body.workOrderId = payload.workOrderId;

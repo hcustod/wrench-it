@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LuMapPin, LuPhone, LuClock, LuSave } from 'react-icons/lu';
 import { getMyShopProfile, updateMyShopProfile } from '../api/shop.js';
+import { loadGoogleMaps, resolveMapsApiKey } from '../lib/googleMaps.js';
 
 const DAY_ORDER = [
   'Monday',
@@ -34,20 +35,21 @@ const EMPTY_FORM = {
 };
 
 const inputStyle = {
-  backgroundColor: '#2A2740',
-  border: '1px solid #3A3652',
+  backgroundColor: 'var(--wt-bg-surface-strong)',
+  border: '1px solid var(--wt-border-strong)',
   borderRadius: 12,
-  color: '#ffffff',
+  color: 'var(--wt-text)',
   padding: '0.6rem 1rem',
   width: '100%',
 };
-const focusBorder = { outline: 'none', borderColor: '#FF8C42' };
+const focusBorder = { outline: 'none', borderColor: 'var(--wt-accent-soft)' };
 
 function buildHours(source) {
   const out = {};
 
   DAY_ORDER.forEach((day) => {
     const sourceWindow = source?.[day] ?? {};
+    // Fill missing days with sensible defaults so the form always renders a complete weekly schedule.
     out[day] = {
       open:
         typeof sourceWindow.open === 'string' && sourceWindow.open.trim()
@@ -89,33 +91,6 @@ function cloneForm(form) {
     ...form,
     hours: cloneHours(form.hours),
   };
-}
-
-function resolveMapsApiKey() {
-  const fromRuntime = window.WRENCHIT_CONFIG?.googleMapsApiKey;
-  if (fromRuntime && fromRuntime.trim()) return fromRuntime.trim();
-  const fromVite = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-  if (fromVite && fromVite.trim()) return fromVite.trim();
-  return '';
-}
-
-async function loadGoogleMaps(apiKey) {
-  if (window.google?.maps) return;
-  if (!apiKey) throw new Error('Google Maps API key is missing.');
-
-  if (!window.__wrenchitGoogleMapsLoader) {
-    window.__wrenchitGoogleMapsLoader = new Promise((resolve, reject) => {
-      const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}`;
-      script.async = true;
-      script.defer = true;
-      script.onload = resolve;
-      script.onerror = () => reject(new Error('Failed to load Google Maps script.'));
-      document.head.appendChild(script);
-    });
-  }
-
-  await window.__wrenchitGoogleMapsLoader;
 }
 
 export default function ManageShopInfoPage() {
@@ -249,6 +224,7 @@ export default function ManageShopInfoPage() {
     setForm((prev) => ({
       ...prev,
       hours: {
+        // Toggling back restores the default window for that day instead of leaving it blank.
         ...prev.hours,
         [day]: isClosed ? { ...DEFAULT_HOURS[day] } : { open: 'Closed', close: '' },
       },
@@ -306,9 +282,9 @@ export default function ManageShopInfoPage() {
           style={{
             padding: '0.75rem 1rem',
             borderRadius: 12,
-            backgroundColor: 'rgba(239,68,68,0.12)',
-            border: '1px solid rgba(239,68,68,0.5)',
-            color: '#f87171',
+            backgroundColor: 'var(--wt-danger-bg)',
+            border: '1px solid var(--wt-danger-border)',
+            color: 'var(--wt-danger)',
           }}
         >
           {error}
@@ -321,9 +297,9 @@ export default function ManageShopInfoPage() {
           style={{
             padding: '0.75rem 1rem',
             borderRadius: 12,
-            backgroundColor: 'rgba(22,163,74,0.15)',
-            border: '1px solid rgba(22,163,74,0.5)',
-            color: '#22c55e',
+            backgroundColor: 'var(--wt-success-bg)',
+            border: '1px solid var(--wt-success-border)',
+            color: 'var(--wt-success)',
           }}
         >
           {saveMessage}
@@ -345,7 +321,7 @@ export default function ManageShopInfoPage() {
                 required
                 style={{ ...inputStyle }}
                 onFocus={(e) => Object.assign(e.target.style, focusBorder)}
-                onBlur={(e) => (e.target.style.borderColor = '#3A3652')}
+                onBlur={(e) => (e.target.style.borderColor = 'var(--wt-border-strong)')}
               />
             </div>
             <div>
@@ -361,7 +337,7 @@ export default function ManageShopInfoPage() {
                     required
                     style={{ ...inputStyle }}
                     onFocus={(e) => Object.assign(e.target.style, focusBorder)}
-                    onBlur={(e) => (e.target.style.borderColor = '#3A3652')}
+                    onBlur={(e) => (e.target.style.borderColor = 'var(--wt-border-strong)')}
                   />
                   <div
                     className="mt-3"
@@ -371,8 +347,8 @@ export default function ManageShopInfoPage() {
                       ref={mapHostRef}
                       className="rounded-4"
                       style={{
-                        backgroundColor: '#2A2740',
-                        border: '1px solid #3A3652',
+                        backgroundColor: 'var(--wt-bg-surface-strong)',
+                        border: '1px solid var(--wt-border-strong)',
                         height: 180,
                       }}
                     />
@@ -382,11 +358,11 @@ export default function ManageShopInfoPage() {
                         style={{
                           position: 'absolute',
                           inset: 0,
-                          backgroundColor: 'rgba(42, 39, 64, 0.92)',
+                          backgroundColor: 'var(--wt-bg-overlay)',
                         }}
                       >
                         <div className="text-center px-3">
-                          <LuMapPin size={40} style={{ color: '#6C63FF' }} className="mb-2" />
+                          <LuMapPin size={40} style={{ color: 'var(--wt-accent)' }} className="mb-2" />
                           <p className="small mb-0">{mapStatus}</p>
                         </div>
                       </div>
@@ -412,7 +388,7 @@ export default function ManageShopInfoPage() {
                   required
                   style={{ ...inputStyle }}
                   onFocus={(e) => Object.assign(e.target.style, focusBorder)}
-                  onBlur={(e) => (e.target.style.borderColor = '#3A3652')}
+                  onBlur={(e) => (e.target.style.borderColor = 'var(--wt-border-strong)')}
                 />
               </div>
             </div>
@@ -422,7 +398,7 @@ export default function ManageShopInfoPage() {
         
         <div className="wt-card mb-4">
           <div className="d-flex align-items-center gap-2 mb-4">
-            <LuClock size={20} style={{ color: '#FF8C42' }} />
+            <LuClock size={20} style={{ color: 'var(--wt-accent-soft)' }} />
             <h2 className="h5 text-white mb-0">Operating Hours</h2>
           </div>
           <div className="d-flex flex-column gap-3">
@@ -445,7 +421,7 @@ export default function ManageShopInfoPage() {
                       placeholder="9:00 AM"
                       style={{ ...inputStyle, maxWidth: 120 }}
                       onFocus={(e) => Object.assign(e.target.style, focusBorder)}
-                      onBlur={(e) => (e.target.style.borderColor = '#3A3652')}
+                      onBlur={(e) => (e.target.style.borderColor = 'var(--wt-border-strong)')}
                     />
                     <span className="wt-text-muted">to</span>
                     <input
@@ -456,7 +432,7 @@ export default function ManageShopInfoPage() {
                       placeholder="5:00 PM"
                       style={{ ...inputStyle, maxWidth: 120 }}
                       onFocus={(e) => Object.assign(e.target.style, focusBorder)}
-                      onBlur={(e) => (e.target.style.borderColor = '#3A3652')}
+                      onBlur={(e) => (e.target.style.borderColor = 'var(--wt-border-strong)')}
                     />
                   </div>
                 )}
@@ -486,7 +462,7 @@ export default function ManageShopInfoPage() {
               resize: 'none',
             }}
             onFocus={(e) => Object.assign(e.target.style, focusBorder)}
-            onBlur={(e) => (e.target.style.borderColor = '#3A3652')}
+            onBlur={(e) => (e.target.style.borderColor = 'var(--wt-border-strong)')}
           />
         </div>
 

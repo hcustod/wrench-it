@@ -41,8 +41,8 @@ export default function AdminUsersPage() {
             style={{
               width: 40,
               height: 40,
-              backgroundColor: 'rgba(255,140,66,0.18)',
-              color: '#FF8C42',
+              backgroundColor: 'var(--wt-accent-bg-strong)',
+              color: 'var(--wt-accent-soft)',
             }}
           >
             <LuUsers size={20} />
@@ -51,7 +51,7 @@ export default function AdminUsersPage() {
         </div>
         <p className="wt-text-muted mb-0">Live user directory from the backend.</p>
         {error && (
-          <p className="small mt-2 mb-0" style={{ color: '#FF8C42' }}>
+          <p className="small mt-2 mb-0" style={{ color: 'var(--wt-accent-soft)' }}>
             {error}
           </p>
         )}
@@ -67,8 +67,8 @@ export default function AdminUsersPage() {
                 <thead>
                   <tr
                     style={{
-                      backgroundColor: '#2A2740',
-                      borderBottom: '1px solid #3A3652',
+                      backgroundColor: 'var(--wt-bg-surface-strong)',
+                      borderBottom: '1px solid var(--wt-border-strong)',
                     }}
                   >
                     <th className="py-2 px-2 px-md-3 text-start small text-white">Name</th>
@@ -83,7 +83,7 @@ export default function AdminUsersPage() {
                       key={user.id}
                       style={{
                         borderBottom:
-                          index === users.length - 1 ? 'none' : '1px solid #3A3652',
+                          index === users.length - 1 ? 'none' : '1px solid var(--wt-border-strong)',
                       }}
                     >
                       <td className="py-3 px-2 px-md-3 text-white small">{user.name ?? '-'}</td>

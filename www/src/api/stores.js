@@ -2,6 +2,7 @@ import { apiFetch } from './client.js';
 
 export function searchStores(params = {}) {
   const search = new URLSearchParams();
+  // Only send filters that are actually set so the backend can keep its defaults simple.
   if (params.q != null && params.q !== '') search.set('q', params.q);
   if (typeof params.limit === 'number') search.set('limit', String(params.limit));
   if (typeof params.offset === 'number') search.set('offset', String(params.offset));
@@ -35,6 +36,7 @@ export function listStoreServices(storeId) {
 
 export function compareStores(ids, options = {}) {
   const search = new URLSearchParams();
+  // Preserve the incoming order so the compare view can keep the user's selected lineup intact.
   ids.forEach((id) => search.append('ids', id));
   if (options.sort) search.set('sort', options.sort);
   if (options.direction) search.set('direction', options.direction);

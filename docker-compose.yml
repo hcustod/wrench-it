@@ -8,8 +8,8 @@ services:
       POSTGRES_USER: ${POSTGRES_APP_USER:-wrenchit_app_user}
       POSTGRES_PASSWORD: ${POSTGRES_APP_PASSWORD:?Set POSTGRES_APP_PASSWORD in .env}
       POSTGRES_DB: ${POSTGRES_APP_DB:-wrenchit_app}
-    ports:
-      - "5432:5432"
+    expose:
+      - "5432"
     volumes:
       - postgres_app_data:/var/lib/postgresql/data
     healthcheck:
@@ -27,8 +27,8 @@ services:
       POSTGRES_USER: ${POSTGRES_KC_USER:-keycloak_user}
       POSTGRES_PASSWORD: ${POSTGRES_KC_PASSWORD:?Set POSTGRES_KC_PASSWORD in .env}
       POSTGRES_DB: ${POSTGRES_KC_DB:-keycloak}
-    ports:
-      - "5434:5432"
+    expose:
+      - "5432"
     volumes:
       - postgres_kc_data:/var/lib/postgresql/data
     healthcheck:
@@ -52,11 +52,13 @@ services:
       KC_DB_URL: jdbc:postgresql://db_keycloak:5432/${POSTGRES_KC_DB:-keycloak}
       KC_DB_USERNAME: ${POSTGRES_KC_USER:-keycloak_user}
       KC_DB_PASSWORD: ${POSTGRES_KC_PASSWORD:?Set POSTGRES_KC_PASSWORD in .env}
-      KC_HTTP_PORT: "8082"
+      KC_HTTP_PORT: "8080"
+      KC_HOSTNAME: ${KEYCLOAK_PUBLIC_HOSTNAME:-auth.localhost}
       KC_HOSTNAME_STRICT: "false"
       KC_HTTP_ENABLED: "true"
-    ports:
-      - "8082:8082"
+      KC_PROXY_HEADERS: "xforwarded"
+    expose:
+      - "8080"
     volumes:
       - ./infra/keycloak/realm-import:/opt/keycloak/data/import-template:ro
       - ./infra/keycloak/start-keycloak.sh:/opt/keycloak/start-keycloak.sh:ro
@@ -66,8 +68,8 @@ services:
   clamav:
     image: mkodockx/docker-clamav:alpine
     container_name: wrenchit-clamav
-    ports:
-      - "${CLAMAV_PORT:-3310}:3310"
+    expose:
+      - "3310"
     restart: unless-stopped
 
   api:
@@ -78,8 +80,8 @@ services:
       - sh
       - -lc
       - ./mvnw -pl services/api -am -DskipTests install && ./mvnw -f services/api/pom.xml spring-boot:run
-    ports:
-      - "8080:8080"
+    expose:
+      - "8080"
     environment:
       POSTGRES_APP_HOST: db_app
       POSTGRES_APP_PORT: 5432
@@ -87,6 +89,7 @@ services:
       POSTGRES_APP_USER: ${POSTGRES_APP_USER:-wrenchit_app_user}
       POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD:?Set POSTGRES_APP_PASSWORD in .env}
       WRENCHIT_SECURITY_AUTH_ENABLED: ${WRENCHIT_SECURITY_AUTH_ENABLED:-true}
+      WRENCHIT_SECURITY_COOKIE_SECURE: ${WRENCHIT_SECURITY_COOKIE_SECURE:-true}
       WRENCHIT_GOOGLE_ENABLED: ${WRENCHIT_GOOGLE_ENABLED:-true}
       GOOGLE_PLACES_API_KEY: ${GOOGLE_PLACES_API_KEY:-}
       WRENCHIT_RECEIPTS_STORAGE_PATH: /var/lib/wrenchit/receipts
@@ -95,8 +98,9 @@ services:
       CLAMAV_HOST: clamav
       CLAMAV_PORT: 3310
       KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-wrenchit-api-public}
-      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_ISSUER_URI:-http://keycloak:8082/realms/wrenchit}
-      KEYCLOAK_JWK_SET_URI: ${KEYCLOAK_JWK_SET_URI:-http://keycloak:8082/realms/wrenchit/protocol/openid-connect/certs}
+      KEYCLOAK_BASE_URL: ${KEYCLOAK_INTERNAL_BASE_URL:-http://keycloak:8080}
+      KEYCLOAK_ISSUER_URI: ${KEYCLOAK_PUBLIC_ISSUER_URI:-https://auth.localhost/realms/wrenchit}
+      KEYCLOAK_JWK_SET_URI: ${KEYCLOAK_INTERNAL_JWK_SET_URI:-http://keycloak:8080/realms/wrenchit/protocol/openid-connect/certs}
       KEYCLOAK_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?Set KEYCLOAK_ADMIN_PASSWORD in .env}
       KEYCLOAK_ADMIN_REALM: ${KEYCLOAK_ADMIN_REALM:-master}
@@ -119,12 +123,30 @@ services:
       args:
         WRENCHIT_FRONTEND_GOOGLE_MAPS_API_KEY: ${WRENCHIT_FRONTEND_GOOGLE_MAPS_API_KEY:-Paste-Key-Here}
     container_name: wrenchit-www
-    ports:
-      - "8081:80"
+    expose:
+      - "80"
     depends_on:
       - api
 
+  caddy:
+    image: caddy:latest
+    container_name: wrenchit-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddydata:/data
+      - caddyconfig:/config
+    depends_on:
+      - www
+      - api
+      - keycloak
+
 volumes:
+  caddydata:
+  caddyconfig:
   postgres_app_data:
   postgres_kc_data:
   maven_cache:

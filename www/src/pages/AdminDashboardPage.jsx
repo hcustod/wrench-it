@@ -112,8 +112,8 @@ export default function AdminDashboardPage() {
             style={{
               width: 40,
               height: 40,
-              backgroundColor: 'rgba(255,140,66,0.18)',
-              color: '#FF8C42',
+              backgroundColor: 'var(--wt-accent-bg-strong)',
+              color: 'var(--wt-accent-soft)',
             }}
           >
             <LuShield size={20} />
@@ -124,7 +124,7 @@ export default function AdminDashboardPage() {
           Platform overview with separate queues for receipt moderation and shop onboarding approvals.
         </p>
         {error && (
-          <p className="small mt-2 mb-0" style={{ color: '#FF8C42' }}>
+          <p className="small mt-2 mb-0" style={{ color: 'var(--wt-accent-soft)' }}>
             {error}
           </p>
         )}
@@ -188,8 +188,8 @@ export default function AdminDashboardPage() {
                     key={user.id}
                     className="rounded-4 p-3 p-md-4 d-flex justify-content-between align-items-center"
                     style={{
-                      backgroundColor: '#2A2740',
-                      border: '1px solid #3A3652',
+                      backgroundColor: 'var(--wt-bg-surface-strong)',
+                      border: '1px solid var(--wt-border-strong)',
                     }}
                   >
                     <div>
@@ -200,10 +200,10 @@ export default function AdminDashboardPage() {
                       <span
                         className="badge mb-1"
                         style={{
-                          backgroundColor: 'rgba(59,130,246,0.18)',
-                          color: '#60a5fa',
+                          backgroundColor: 'var(--wt-info-bg)',
+                          color: 'var(--wt-info)',
                           borderRadius: 999,
-                          border: '1px solid rgba(59,130,246,0.6)',
+                          border: '1px solid var(--wt-info-border)',
                         }}
                       >
                         {user.type}
@@ -226,10 +226,10 @@ export default function AdminDashboardPage() {
                 <span
                   className="badge"
                   style={{
-                    backgroundColor: 'rgba(248,113,113,0.18)',
-                    color: '#f87171',
+                    backgroundColor: 'var(--wt-danger-bg)',
+                    color: 'var(--wt-danger)',
                     borderRadius: 999,
-                    border: '1px solid rgba(248,113,113,0.6)',
+                    border: '1px solid var(--wt-danger-border)',
                   }}
                 >
                   {rejectedVerifications.length} cases
@@ -242,8 +242,8 @@ export default function AdminDashboardPage() {
                     key={review.id}
                     className="rounded-4 p-3 p-md-4"
                     style={{
-                      backgroundColor: 'rgba(127,29,29,0.5)',
-                      border: '2px solid rgba(248,113,113,0.6)',
+                      backgroundColor: 'var(--wt-danger-bg)',
+                      border: '2px solid var(--wt-danger-border)',
                     }}
                   >
                     <div className="d-flex justify-content-between align-items-start mb-2">
@@ -253,7 +253,7 @@ export default function AdminDashboardPage() {
                           Submitted by {review.reviewer} • {review.date}
                         </p>
                       </div>
-                      <LuTriangleAlert size={18} style={{ color: '#f87171' }} />
+                      <LuTriangleAlert size={18} style={{ color: 'var(--wt-danger)' }} />
                     </div>
                     <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
                       <p className="text-danger small mb-0">Warning: {review.reason}</p>
@@ -279,10 +279,10 @@ export default function AdminDashboardPage() {
             <span
               className="badge"
               style={{
-                backgroundColor: 'rgba(255,140,66,0.18)',
-                color: '#FF8C42',
+                backgroundColor: 'var(--wt-accent-bg-strong)',
+                color: 'var(--wt-accent-soft)',
                 borderRadius: 999,
-                border: '1px solid rgba(255,140,66,0.6)',
+                border: '1px solid var(--wt-accent-border)',
               }}
             >
               {pendingShops.length} pending
@@ -294,8 +294,8 @@ export default function AdminDashboardPage() {
               <thead>
                 <tr
                   style={{
-                    backgroundColor: '#2A2740',
-                    borderBottom: '1px solid #3A3652',
+                    backgroundColor: 'var(--wt-bg-surface-strong)',
+                    borderBottom: '1px solid var(--wt-border-strong)',
                   }}
                 >
                   <th className="py-2 px-2 px-md-3 text-start small text-white">Shop</th>
@@ -313,7 +313,7 @@ export default function AdminDashboardPage() {
                       borderBottom:
                         index === pendingShops.length - 1
                           ? 'none'
-                          : '1px solid #3A3652',
+                          : '1px solid var(--wt-border-strong)',
                     }}
                   >
                     <td className="py-3 px-2 px-md-3 text-white small">{shop.name}</td>
@@ -364,10 +364,10 @@ export default function AdminDashboardPage() {
             <span
               className="badge"
               style={{
-                backgroundColor: 'rgba(255,140,66,0.18)',
-                color: '#FF8C42',
+                backgroundColor: 'var(--wt-accent-bg-strong)',
+                color: 'var(--wt-accent-soft)',
                 borderRadius: 999,
-                border: '1px solid rgba(255,140,66,0.6)',
+                border: '1px solid var(--wt-accent-border)',
               }}
             >
               {pendingReceipts.length} pending
@@ -379,8 +379,8 @@ export default function AdminDashboardPage() {
               <thead>
                 <tr
                   style={{
-                    backgroundColor: '#2A2740',
-                    borderBottom: '1px solid #3A3652',
+                    backgroundColor: 'var(--wt-bg-surface-strong)',
+                    borderBottom: '1px solid var(--wt-border-strong)',
                   }}
                 >
                   <th className="py-2 px-2 px-md-3 text-start small text-white">Shop</th>
@@ -398,7 +398,7 @@ export default function AdminDashboardPage() {
                       borderBottom:
                         index === pendingReceipts.length - 1
                           ? 'none'
-                          : '1px solid #3A3652',
+                          : '1px solid var(--wt-border-strong)',
                     }}
                   >
                     <td className="py-3 px-2 px-md-3 text-white small">{receipt.name}</td>

@@ -55,6 +55,7 @@ async function fetchWithSession(path, options = {}, allowRefresh = true) {
   }
 
   try {
+    // Non-auth requests get one silent retry so regular page actions survive an expired access token.
     await refreshSession();
   } catch {
     await logout();

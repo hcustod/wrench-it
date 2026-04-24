@@ -41,6 +41,7 @@ wrenchit:
     keycloak:
       client-id: ${KEYCLOAK_CLIENT_ID:wrenchit-api-public}
       issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8082/realms/wrenchit}
+      base-uri: ${KEYCLOAK_BASE_URL:${KEYCLOAK_ISSUER_URI:http://localhost:8082/realms/wrenchit}}
       admin-username: ${KEYCLOAK_ADMIN_USERNAME:${KEYCLOAK_ADMIN:admin}}
       admin-password: ${KEYCLOAK_ADMIN_PASSWORD:}
       admin-realm: ${KEYCLOAK_ADMIN_REALM:master}

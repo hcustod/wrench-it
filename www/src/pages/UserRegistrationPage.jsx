@@ -67,7 +67,7 @@ export default function UserRegistrationPage() {
 
         <div className="wt-card">
           {error && (
-            <div className="mb-3 small" style={{ color: '#FF8C42' }}>
+            <div className="mb-3 small" style={{ color: 'var(--wt-accent-soft)' }}>
               {error}
             </div>
           )}
@@ -93,7 +93,7 @@ export default function UserRegistrationPage() {
                 />
               </div>
               {fieldErrors.fullName && (
-                <div className="small mt-1" style={{ color: '#FF8C42' }}>
+                <div className="small mt-1" style={{ color: 'var(--wt-accent-soft)' }}>
                   {fieldErrors.fullName}
                 </div>
               )}
@@ -114,7 +114,7 @@ export default function UserRegistrationPage() {
                 />
               </div>
               {fieldErrors.email && (
-                <div className="small mt-1" style={{ color: '#FF8C42' }}>
+                <div className="small mt-1" style={{ color: 'var(--wt-accent-soft)' }}>
                   {fieldErrors.email}
                 </div>
               )}
@@ -135,7 +135,7 @@ export default function UserRegistrationPage() {
                 />
               </div>
               {fieldErrors.password && (
-                <div className="small mt-1" style={{ color: '#FF8C42' }}>
+                <div className="small mt-1" style={{ color: 'var(--wt-accent-soft)' }}>
                   {fieldErrors.password}
                 </div>
               )}
@@ -156,7 +156,7 @@ export default function UserRegistrationPage() {
                 />
               </div>
               {error && (
-                <div className="small mt-1" style={{ color: '#FF8C42' }}>
+                <div className="small mt-1" style={{ color: 'var(--wt-accent-soft)' }}>
                   {error}
                 </div>
               )}
@@ -165,8 +165,8 @@ export default function UserRegistrationPage() {
             <div
               className="rounded-4 p-3 small"
               style={{
-                backgroundColor: 'rgba(108,99,255,0.1)',
-                border: '1px solid rgba(108,99,255,0.4)',
+                backgroundColor: 'var(--wt-accent-bg)',
+                border: '1px solid var(--wt-accent-border)',
               }}
             >
               <label className="d-flex align-items-start gap-2">
@@ -192,9 +192,9 @@ export default function UserRegistrationPage() {
           </form>
 
           <div className="d-flex align-items-center gap-2 my-3">
-            <div className="flex-grow-1" style={{ height: 1, backgroundColor: '#3A3652' }} />
+            <div className="flex-grow-1" style={{ height: 1, backgroundColor: 'var(--wt-border-strong)' }} />
             <span className="wt-text-muted small">or</span>
-            <div className="flex-grow-1" style={{ height: 1, backgroundColor: '#3A3652' }} />
+            <div className="flex-grow-1" style={{ height: 1, backgroundColor: 'var(--wt-border-strong)' }} />
           </div>
 
           <div className="text-center small">
@@ -211,7 +211,7 @@ export default function UserRegistrationPage() {
         <div className="text-center mt-3 small">
           <Link
             to="/register-pro"
-            style={{ color: '#FF8C42', textDecoration: 'none' }}
+            style={{ color: 'var(--wt-accent-soft)', textDecoration: 'none' }}
           >
             Are you a mechanic or shop owner? Register here →
           </Link>

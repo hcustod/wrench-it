@@ -23,10 +23,10 @@ const CATEGORIES = [
 ];
 
 const inputStyle = {
-  backgroundColor: '#2A2740',
-  border: '1px solid #3A3652',
+  backgroundColor: 'var(--wt-bg-surface-strong)',
+  border: '1px solid var(--wt-border-strong)',
   borderRadius: 12,
-  color: '#ffffff',
+  color: 'var(--wt-text)',
   padding: '0.6rem 1rem',
   width: '100%',
 };
@@ -52,6 +52,7 @@ function toUpsertPayload(service) {
   const parsedPrice = Number(service.price);
   return {
     name: service.name.trim(),
+    // Let the API own the final money validation, but avoid sending NaN from the form.
     price: Number.isFinite(parsedPrice) ? parsedPrice : 0,
     duration: service.duration === '—' ? '' : service.duration,
     category: service.category,
@@ -105,6 +106,7 @@ export default function ManageServicesPage() {
 
     try {
       await deleteMyShopService(id);
+      // Update the table in place so owners get immediate feedback without a full reload.
       setServices((prev) => prev.filter((s) => s.id !== id));
       if (editingId === id) setEditingId(null);
     } catch (err) {
@@ -144,6 +146,7 @@ export default function ManageServicesPage() {
 
   function handleUpdateService(id, field, value) {
     setServices((prev) =>
+      // Keep edits local until save so users can back out or fix multiple fields before the request.
       prev.map((s) => (s.id === id ? { ...s, [field]: value } : s))
     );
   }
@@ -198,7 +201,7 @@ export default function ManageServicesPage() {
       </section>
 
       {error && (
-        <p className="small mb-3" style={{ color: '#FF8C42' }}>
+        <p className="small mb-3" style={{ color: 'var(--wt-accent-soft)' }}>
           {error}
         </p>
       )}
@@ -206,7 +209,7 @@ export default function ManageServicesPage() {
       <div className="wt-card p-0 mb-4 overflow-hidden">
         <div
           className="p-4 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2"
-          style={{ backgroundColor: '#2A2740', borderBottom: '1px solid #3A3652' }}
+          style={{ backgroundColor: 'var(--wt-bg-surface-strong)', borderBottom: '1px solid var(--wt-border-strong)' }}
         >
           <div>
             <h2 className="h6 text-white mb-1">Your Services</h2>
@@ -218,7 +221,7 @@ export default function ManageServicesPage() {
         <div className="table-responsive">
           <table className="w-100">
             <thead>
-              <tr style={{ backgroundColor: '#2A2740', borderBottom: '1px solid #3A3652' }}>
+              <tr style={{ backgroundColor: 'var(--wt-bg-surface-strong)', borderBottom: '1px solid var(--wt-border-strong)' }}>
                 <th className="px-3 px-md-4 py-3 text-start text-white small">Service Name</th>
                 <th className="px-3 px-md-4 py-3 text-start text-white small">Price</th>
                 <th className="px-3 px-md-4 py-3 text-start text-white small">Duration</th>
@@ -231,7 +234,7 @@ export default function ManageServicesPage() {
                 <tr
                   key={service.id}
                   style={{
-                    borderBottom: idx < services.length - 1 ? '1px solid #3A3652' : 'none',
+                    borderBottom: idx < services.length - 1 ? '1px solid var(--wt-border-strong)' : 'none',
                   }}
                 >
                   <td className="px-3 px-md-4 py-3">
@@ -297,10 +300,10 @@ export default function ManageServicesPage() {
                       <span
                         className="badge"
                         style={{
-                          backgroundColor: 'rgba(255,140,66,0.2)',
-                          color: '#FF8C42',
+                          backgroundColor: 'var(--wt-accent-bg-strong)',
+                          color: 'var(--wt-accent-soft)',
                           borderRadius: 999,
-                          border: '1px solid rgba(255,140,66,0.4)',
+                          border: '1px solid var(--wt-accent-border)',
                         }}
                       >
                         {service.category}
@@ -375,7 +378,7 @@ export default function ManageServicesPage() {
       {showAddModal && (
         <div
           className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center p-3"
-          style={{ backgroundColor: 'rgba(0,0,0,0.7)', zIndex: 1050 }}
+          style={{ backgroundColor: 'rgba(7, 20, 22, 0.76)', zIndex: 1050 }}
           onClick={() => setShowAddModal(false)}
         >
           <div

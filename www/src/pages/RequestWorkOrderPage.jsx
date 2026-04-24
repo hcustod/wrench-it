@@ -7,6 +7,7 @@ function toIsoFromLocal(value) {
   if (!value) return '';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
+  // Send a full ISO timestamp so the backend can store one consistent format.
   return date.toISOString();
 }
 
@@ -103,6 +104,7 @@ export default function RequestWorkOrderPage() {
       });
       setCreatedWorkOrder(created ?? null);
       setSuccess('Work order request submitted to the shop.');
+      // Leave the selected shop and service in place so the user still has context after submit.
       setCustomerNotes('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create work order.');
@@ -126,12 +128,12 @@ export default function RequestWorkOrderPage() {
             <div className="small mb-3 wt-text-muted">Loading shop and service data...</div>
           )}
           {contextError && (
-            <div className="small mb-3" style={{ color: '#FF8C42' }}>
+            <div className="small mb-3" style={{ color: 'var(--wt-accent-soft)' }}>
               {contextError}
             </div>
           )}
           {error && (
-            <div className="small mb-3" style={{ color: '#FF8C42' }}>
+            <div className="small mb-3" style={{ color: 'var(--wt-accent-soft)' }}>
               {error}
             </div>
           )}
@@ -218,10 +220,10 @@ export default function RequestWorkOrderPage() {
                 className="form-control"
                 rows={5}
                 style={{
-                  backgroundColor: '#2A2740',
-                  border: '1px solid #3A3652',
+                  backgroundColor: 'var(--wt-bg-surface-strong)',
+                  border: '1px solid var(--wt-border-strong)',
                   borderRadius: 12,
-                  color: '#ffffff',
+                  color: 'var(--wt-text)',
                   fontSize: '0.95rem',
                   resize: 'none',
                 }}
@@ -245,8 +247,8 @@ export default function RequestWorkOrderPage() {
             <div
               className="rounded-4 p-3 mt-4"
               style={{
-                backgroundColor: '#2A2740',
-                border: '1px solid #3A3652',
+                backgroundColor: 'var(--wt-bg-surface-strong)',
+                border: '1px solid var(--wt-border-strong)',
               }}
             >
               <div className="text-white mb-1">Request created</div>

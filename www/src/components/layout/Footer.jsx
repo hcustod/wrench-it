@@ -8,7 +8,7 @@ export default function Footer() {
         <div className="row g-4">
           <div className="col-12 col-md-4">
             <div className="d-flex align-items-center gap-2 mb-3">
-              <LuWrench size={20} style={{ color: '#6C63FF' }} />
+              <LuWrench size={20} style={{ color: 'var(--wt-accent)' }} />
               <span className="text-white">WrenchIT</span>
             </div>
             <p className="wt-text-muted small mb-0">
@@ -82,7 +82,7 @@ export default function Footer() {
 
         <div
           className="mt-4 pt-4 text-center wt-text-muted small"
-          style={{ borderTop: '1px solid #3A3652' }}
+          style={{ borderTop: '1px solid var(--wt-border-strong)' }}
         >
           © {new Date().getFullYear()} WrenchIT. All rights reserved.
         </div>

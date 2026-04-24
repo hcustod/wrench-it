@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { LuMapPin, LuSearch, LuSlidersHorizontal, LuStar } from 'react-icons/lu';
 import { searchStores } from '../api/stores.js';
 import ShopCard from '../components/shop/ShopCard.jsx';
+import { loadGoogleMaps, resolveMapsApiKey } from '../lib/googleMaps.js';
 
 const CATEGORIES = [
   'All Services',
@@ -88,33 +89,6 @@ function parseLocationFilters(locationText) {
     return { city: null, state: token.toUpperCase() };
   }
   return { city: token, state: null };
-}
-
-function resolveMapsApiKey() {
-  const fromRuntime = window.WRENCHIT_CONFIG?.googleMapsApiKey;
-  if (fromRuntime && fromRuntime.trim()) return fromRuntime.trim();
-  const fromVite = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-  if (fromVite && fromVite.trim()) return fromVite.trim();
-  return '';
-}
-
-async function loadGoogleMaps(apiKey) {
-  if (window.google?.maps) return;
-  if (!apiKey) throw new Error('Google Maps API key is missing.');
-
-  if (!window.__wrenchitGoogleMapsLoader) {
-    window.__wrenchitGoogleMapsLoader = new Promise((resolve, reject) => {
-      const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}`;
-      script.async = true;
-      script.defer = true;
-      script.onload = resolve;
-      script.onerror = () => reject(new Error('Failed to load Google Maps script.'));
-      document.head.appendChild(script);
-    });
-  }
-
-  await window.__wrenchitGoogleMapsLoader;
 }
 
 export default function SearchPage() {
@@ -234,6 +208,7 @@ export default function SearchPage() {
           && qLocation
           && qLocation.toLowerCase() !== 'current location';
         const { city: cityParam, state: stateParam } = parseLocationFilters(qLocation);
+        // If the location looks like plain text instead of city/state filters, let the backend search against it directly.
         const qParam = qService.trim() || (shouldUseLocationText && !cityParam && !stateParam
           ? qLocation
           : '');
@@ -436,9 +411,9 @@ export default function SearchPage() {
         icon: {
           path: window.google.maps.SymbolPath.CIRCLE,
           scale: 6,
-          fillColor: '#4da3ff',
+          fillColor: '#149488',
           fillOpacity: 1,
-          strokeColor: '#ffffff',
+          strokeColor: '#ecfffb',
           strokeWeight: 2,
         },
       });
@@ -447,10 +422,10 @@ export default function SearchPage() {
         map: mapRef.current,
         center: userCoords,
         radius: distance * 1609.34,
-        strokeColor: '#4da3ff',
+        strokeColor: '#149488',
         strokeOpacity: 0.65,
         strokeWeight: 1,
-        fillColor: '#4da3ff',
+        fillColor: '#149488',
         fillOpacity: 0.12,
       });
       bounds.extend(userCoords);
@@ -468,6 +443,7 @@ export default function SearchPage() {
       markerCount += 1;
     });
 
+    // Fit to whichever markers are available so the map still feels useful for both broad and local searches.
     if (markerCount > 0 || userCoords) {
       mapRef.current.fitBounds(bounds);
       if (markerCount === 1 && !userCoords) {
@@ -542,7 +518,7 @@ export default function SearchPage() {
                 <h3 className="h6 mb-0 text-white">Filters</h3>
               </div>
 
-              <div className="mb-4 pb-4" style={{ borderBottom: '1px solid #3A3652' }}>
+              <div className="mb-4 pb-4" style={{ borderBottom: '1px solid var(--wt-border-strong)' }}>
                 <label className="d-block text-white mb-2 small">
                   Distance: {distance} miles
                 </label>
@@ -560,7 +536,7 @@ export default function SearchPage() {
                 </div>
               </div>
 
-              <div className="mb-4 pb-4" style={{ borderBottom: '1px solid #3A3652' }}>
+              <div className="mb-4 pb-4" style={{ borderBottom: '1px solid var(--wt-border-strong)' }}>
                 <label className="d-block text-white mb-2 small">Minimum Rating</label>
                 <div className="d-flex flex-column gap-2">
                   {[4.5, 4.0, 3.5, 3.0].map((rating) => (
@@ -573,7 +549,7 @@ export default function SearchPage() {
                         onChange={() => setMinRating(rating)}
                       />
                       <div className="d-flex align-items-center gap-1">
-                        <LuStar size={16} style={{ color: '#6C63FF' }} />
+                        <LuStar size={16} style={{ color: 'var(--wt-warning)' }} />
                         <span>{rating}+</span>
                       </div>
                     </label>
@@ -591,7 +567,7 @@ export default function SearchPage() {
                 </div>
               </div>
 
-              <div className="mb-4 pb-4" style={{ borderBottom: '1px solid #3A3652' }}>
+              <div className="mb-4 pb-4" style={{ borderBottom: '1px solid var(--wt-border-strong)' }}>
                 <label className="d-block text-white mb-2 small">Service Category</label>
                 <select
                   value={selectedCategory}
@@ -695,7 +671,7 @@ export default function SearchPage() {
 
             {loading && <p className="wt-text-muted small mb-2">Loading shops...</p>}
             {error && !loading && (
-              <p className="small mb-2" style={{ color: '#FF8C42' }}>
+              <p className="small mb-2" style={{ color: 'var(--wt-accent-soft)' }}>
                 {error}
               </p>
             )}
@@ -721,7 +697,7 @@ export default function SearchPage() {
                     style={{
                       position: 'absolute',
                       inset: 0,
-                      backgroundColor: 'rgba(42, 39, 64, 0.92)',
+                      backgroundColor: 'var(--wt-bg-overlay)',
                     }}
                   >
                     <p className="wt-text-muted mb-0 px-3 text-center">{mapStatus}</p>

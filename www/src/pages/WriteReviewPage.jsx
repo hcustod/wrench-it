@@ -55,6 +55,7 @@ export default function WriteReviewPage() {
         setShop(storeRes);
         setWorkOrders(reviewableWorkOrders ?? []);
 
+        // If the page was opened from a specific job, keep that visit selected when it is still reviewable.
         const nextSelected =
           (reviewableWorkOrders ?? []).find((item) => item.id === preselectedWorkOrderId)?.id
           || reviewableWorkOrders?.[0]?.id
@@ -111,6 +112,7 @@ export default function WriteReviewPage() {
       let receiptId;
 
       if (receiptFile) {
+        // Upload the receipt first so the review can point at the stored file in one submit flow.
         const receipt = await createReceipt({
           file: receiptFile,
           storeId: selectedWorkOrder.storeId,
@@ -127,6 +129,7 @@ export default function WriteReviewPage() {
         receiptId,
       });
 
+      // Remove the visit locally after submit so users do not accidentally review the same work order twice.
       const remainingWorkOrders = workOrders.filter((item) => item.id !== selectedWorkOrder.id);
       setSuccess('Review submitted for verification.');
       setRating(0);
@@ -168,12 +171,12 @@ export default function WriteReviewPage() {
             <div className="small mb-3 wt-text-muted">Loading completed work orders...</div>
           )}
           {contextError && (
-            <div className="small mb-3" style={{ color: '#FF8C42' }}>
+            <div className="small mb-3" style={{ color: 'var(--wt-accent-soft)' }}>
               {contextError}
             </div>
           )}
           {error && (
-            <div className="small mb-3" style={{ color: '#FF8C42' }}>
+            <div className="small mb-3" style={{ color: 'var(--wt-accent-soft)' }}>
               {error}
             </div>
           )}
@@ -187,8 +190,8 @@ export default function WriteReviewPage() {
             <div
               className="rounded-4 p-3 mb-3"
               style={{
-                backgroundColor: '#2A2740',
-                border: '1px solid #3A3652',
+                backgroundColor: 'var(--wt-bg-surface-strong)',
+                border: '1px solid var(--wt-border-strong)',
               }}
             >
               <div className="text-white mb-1">No completed work orders are ready for review.</div>
@@ -274,8 +277,8 @@ export default function WriteReviewPage() {
                         size={28}
                         style={
                           active
-                            ? { color: '#FF8C42', fill: '#FF8C42' }
-                            : { color: '#3A3652' }
+                            ? { color: 'var(--wt-warning)', fill: 'var(--wt-warning)' }
+                            : { color: 'var(--wt-border-strong)' }
                         }
                       />
                     </button>
@@ -290,10 +293,10 @@ export default function WriteReviewPage() {
                 className="form-control"
                 rows={5}
                 style={{
-                  backgroundColor: '#2A2740',
-                  border: '1px solid #3A3652',
+                  backgroundColor: 'var(--wt-bg-surface-strong)',
+                  border: '1px solid var(--wt-border-strong)',
                   borderRadius: 12,
-                  color: '#ffffff',
+                  color: 'var(--wt-text)',
                   fontSize: '0.95rem',
                   resize: 'none',
                 }}
@@ -310,7 +313,7 @@ export default function WriteReviewPage() {
               <div
                 className="d-flex flex-column align-items-center justify-content-center text-center"
                 style={{
-                  border: '2px dashed #3A3652',
+                  border: '2px dashed var(--wt-border-strong)',
                   borderRadius: 12,
                   padding: '2rem',
                 }}
@@ -348,11 +351,11 @@ export default function WriteReviewPage() {
             <div
               className="rounded-4 p-3 d-flex gap-2 align-items-start"
               style={{
-                backgroundColor: 'rgba(59,130,246,0.12)',
-                border: '1px solid rgba(59,130,246,0.35)',
+                backgroundColor: 'var(--wt-info-bg)',
+                border: '1px solid var(--wt-info-border)',
               }}
             >
-              <LuInfo size={18} style={{ color: '#60a5fa', flexShrink: 0, marginTop: 2 }} />
+              <LuInfo size={18} style={{ color: 'var(--wt-info)', flexShrink: 0, marginTop: 2 }} />
               <div className="small wt-text-muted">
                 Uploaded receipts will be reviewed by a certified mechanic to help verify that this completed visit really happened.
               </div>

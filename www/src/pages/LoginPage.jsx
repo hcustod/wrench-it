@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { LuMail, LuLock, LuLogIn } from 'react-icons/lu';
 import { beginLogin, beginPasswordReset } from '../auth/keycloak.js';
 
 export default function LoginPage() {
+  const location = useLocation();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -19,7 +20,10 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const result = await beginLogin({ email, password });
-      navigate(result.returnTo ?? '/dashboard', { replace: true });
+      const from = typeof location.state?.from === 'string' && location.state.from.startsWith('/')
+        ? location.state.from
+        : null;
+      navigate(from || result.returnTo || '/dashboard', { replace: true });
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'Unable to sign in.');
       if (err && typeof err === 'object' && err.errors && typeof err.errors === 'object') {
@@ -36,6 +40,7 @@ export default function LoginPage() {
     setResetting(true);
     try {
       const payload = await beginPasswordReset({ email });
+      // Mirror the backend's generic reset response so we do not hint whether the email is registered.
       setMessage(
         typeof payload?.message === 'string' && payload.message.trim()
           ? payload.message
@@ -88,7 +93,7 @@ export default function LoginPage() {
                 />
               </div>
               {fieldErrors.email && (
-                <div className="small mt-1" style={{ color: '#FF8C42' }}>
+                <div className="small mt-1" style={{ color: 'var(--wt-accent-soft)' }}>
                   {fieldErrors.email}
                 </div>
               )}
@@ -112,7 +117,7 @@ export default function LoginPage() {
                 />
               </div>
               {fieldErrors.password && (
-                <div className="small mt-1" style={{ color: '#FF8C42' }}>
+                <div className="small mt-1" style={{ color: 'var(--wt-accent-soft)' }}>
                   {fieldErrors.password}
                 </div>
               )}
@@ -132,7 +137,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 className="btn btn-link p-0 small"
-                style={{ color: '#6C63FF', textDecoration: 'none' }}
+                style={{ color: 'var(--wt-accent)', textDecoration: 'none' }}
                 onClick={handleForgotPassword}
                 disabled={resetting}
                 title="Send a reset link to your email."
@@ -152,9 +157,9 @@ export default function LoginPage() {
           </form>
 
           <div className="d-flex align-items-center gap-2 my-3">
-            <div className="flex-grow-1" style={{ height: 1, backgroundColor: '#3A3652' }} />
+            <div className="flex-grow-1" style={{ height: 1, backgroundColor: 'var(--wt-border-strong)' }} />
             <span className="wt-text-muted small">or</span>
-            <div className="flex-grow-1" style={{ height: 1, backgroundColor: '#3A3652' }} />
+            <div className="flex-grow-1" style={{ height: 1, backgroundColor: 'var(--wt-border-strong)' }} />
           </div>
 
           <div className="text-center small">

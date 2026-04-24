@@ -59,8 +59,8 @@ export default function MechanicDashboardPage() {
             style={{
               width: 40,
               height: 40,
-              backgroundColor: 'rgba(255,140,66,0.18)',
-              color: '#FF8C42',
+              backgroundColor: 'var(--wt-accent-bg-strong)',
+              color: 'var(--wt-accent-soft)',
             }}
           >
             <LuBadgeCheck size={20} />
@@ -70,7 +70,7 @@ export default function MechanicDashboardPage() {
           Review receipt evidence attached to customer reviews to keep the platform trustworthy.
         </p>
         {error && (
-          <p className="small mt-2 mb-0" style={{ color: '#FF8C42' }}>
+          <p className="small mt-2 mb-0" style={{ color: 'var(--wt-accent-soft)' }}>
             {error}
           </p>
         )}
@@ -133,8 +133,8 @@ export default function MechanicDashboardPage() {
                 key={review.id}
                 className="rounded-4 p-3 p-md-4"
                 style={{
-                  backgroundColor: '#2A2740',
-                  border: '2px solid rgba(255,140,66,0.6)',
+                  backgroundColor: 'var(--wt-bg-surface-strong)',
+                  border: '2px solid var(--wt-accent-border)',
                 }}
               >
                 <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
@@ -145,10 +145,10 @@ export default function MechanicDashboardPage() {
                         <span
                           className="badge text-uppercase"
                           style={{
-                            backgroundColor: 'rgba(22,163,74,0.15)',
-                            color: '#22c55e',
+                            backgroundColor: 'var(--wt-success-bg)',
+                            color: 'var(--wt-success)',
                             borderRadius: 999,
-                            border: '1px solid rgba(22,163,74,0.6)',
+                            border: '1px solid var(--wt-success-border)',
                           }}
                         >
                           Has receipt
@@ -192,8 +192,8 @@ export default function MechanicDashboardPage() {
                 key={review.id}
                 className="rounded-4 p-3 p-md-4 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3"
                 style={{
-                  backgroundColor: '#2A2740',
-                  border: '1px solid #3A3652',
+                  backgroundColor: 'var(--wt-bg-surface-strong)',
+                  border: '1px solid var(--wt-border-strong)',
                 }}
               >
                 <div>
@@ -211,10 +211,10 @@ export default function MechanicDashboardPage() {
                 <span
                   className="badge d-inline-flex align-items-center gap-1"
                   style={{
-                    backgroundColor: 'rgba(22,163,74,0.15)',
-                    color: '#22c55e',
+                    backgroundColor: 'var(--wt-success-bg)',
+                    color: 'var(--wt-success)',
                     borderRadius: 999,
-                    border: '1px solid rgba(22,163,74,0.6)',
+                    border: '1px solid var(--wt-success-border)',
                   }}
                 >
                   <LuBadgeCheck size={16} />

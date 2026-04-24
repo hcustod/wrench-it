@@ -11,11 +11,11 @@ export default function NotFoundPage() {
             style={{
               width: 96,
               height: 96,
-              backgroundColor: '#2A2740',
-              border: '1px solid #3A3652',
+              backgroundColor: 'var(--wt-bg-surface-strong)',
+              border: '1px solid var(--wt-border-strong)',
             }}
           >
-            <LuTriangleAlert size={48} style={{ color: '#6C63FF' }} />
+            <LuTriangleAlert size={48} style={{ color: 'var(--wt-accent)' }} />
           </div>
           <h1 className="display-5 text-white mb-1">404</h1>
           <h2 className="h4 text-white mb-2">Page Not Found</h2>
@@ -43,7 +43,7 @@ export default function NotFoundPage() {
 
         <div
           className="pt-4 mt-4 border-top"
-          style={{ borderColor: '#3A3652' }}
+          style={{ borderColor: 'var(--wt-border-strong)' }}
         >
           <p className="wt-text-muted small mb-3">Helpful links</p>
           <div className="d-flex justify-content-center gap-4 flex-wrap">

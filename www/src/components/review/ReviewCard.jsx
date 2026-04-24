@@ -27,6 +27,7 @@ export default function ReviewCard({
   verificationStatus,
   date,
 }) {
+  // Round for display so half-step math from APIs does not produce awkward star fills in the card UI.
   const fullStars = Math.round(rating ?? 0);
   const verification = VERIFICATION_CONFIG[verificationStatus] ?? null;
   const VerificationIcon = verification?.Icon;
@@ -54,8 +55,8 @@ export default function ReviewCard({
               className={idx < fullStars ? '' : 'wt-text-muted'}
               style={
                 idx < fullStars
-                  ? { color: '#6C63FF', fill: '#6C63FF' }
-                  : { color: '#3A3652' }
+                  ? { color: 'var(--wt-warning)', fill: 'var(--wt-warning)' }
+                  : { color: 'var(--wt-border-strong)' }
               }
             />
           ))}
@@ -66,8 +67,8 @@ export default function ReviewCard({
         <div
           className="rounded-4 p-3 mt-3"
           style={{
-            backgroundColor: 'rgba(108,99,255,0.12)',
-            border: '1px solid rgba(108,99,255,0.4)',
+            backgroundColor: 'var(--wt-accent-bg)',
+            border: '1px solid var(--wt-accent-border)',
           }}
         >
           <p className="text-white small mb-1">

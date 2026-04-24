@@ -2,29 +2,29 @@ import React from 'react';
 
 const TONE_STYLES = {
   default: {
-    iconBg: 'rgba(108,99,255,0.15)',
-    iconColor: '#6C63FF',
-    borderColor: '#3A3652',
+    iconBg: 'var(--wt-accent-bg)',
+    iconColor: 'var(--wt-accent)',
+    borderColor: 'var(--wt-border-strong)',
   },
   accent: {
-    iconBg: 'rgba(255,140,66,0.18)',
-    iconColor: '#FF8C42',
-    borderColor: 'rgba(255,140,66,0.6)',
+    iconBg: 'var(--wt-accent-bg-strong)',
+    iconColor: 'var(--wt-accent-soft)',
+    borderColor: 'var(--wt-accent-border)',
   },
   success: {
-    iconBg: 'rgba(22,163,74,0.18)',
-    iconColor: '#16a34a',
-    borderColor: 'rgba(22,163,74,0.6)',
+    iconBg: 'var(--wt-success-bg)',
+    iconColor: 'var(--wt-success)',
+    borderColor: 'var(--wt-success-border)',
   },
   danger: {
-    iconBg: 'rgba(239,68,68,0.18)',
-    iconColor: '#ef4444',
-    borderColor: 'rgba(239,68,68,0.6)',
+    iconBg: 'var(--wt-danger-bg)',
+    iconColor: 'var(--wt-danger)',
+    borderColor: 'var(--wt-danger-border)',
   },
   soft: {
-    iconBg: 'rgba(166,153,255,0.18)',
-    iconColor: '#A699FF',
-    borderColor: 'rgba(166,153,255,0.6)',
+    iconBg: 'var(--wt-info-bg)',
+    iconColor: 'var(--wt-info)',
+    borderColor: 'var(--wt-info-border)',
   },
 };
 
@@ -58,7 +58,7 @@ export default function StatsCard({ icon: Icon, label, value, tone = 'default', 
         <div>
           <div className="h4 mb-0 text-white">{value}</div>
           {helper && (
-            <div className="small" style={{ color: '#7DD3FC' }}>
+            <div className="small" style={{ color: 'var(--wt-info)' }}>
               {helper}
             </div>
           )}
@@ -67,4 +67,3 @@ export default function StatsCard({ icon: Icon, label, value, tone = 'default', 
     </div>
   );
 }
-

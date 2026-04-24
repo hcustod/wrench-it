@@ -65,6 +65,7 @@ export default function UserDashboardPage() {
           canReview: Boolean(item.canReview),
         }));
 
+        // Normalize the dashboard payload once here so the tab views can stay presentation-only.
         const reviewItems = (response?.reviews ?? []).map((item) => ({
           id: item.id,
           storeId: item.storeId,
@@ -145,6 +146,7 @@ export default function UserDashboardPage() {
     [workOrders],
   );
   const closedWorkOrders = useMemo(
+    // Keep completed and declined jobs separate so the active list stays useful at a glance.
     () => workOrders.filter((item) => isClosedStatus(item.status)),
     [workOrders],
   );
@@ -183,7 +185,7 @@ export default function UserDashboardPage() {
         <div className="wt-card p-0">
           <div
             className="d-flex flex-wrap"
-            style={{ borderBottom: '1px solid #3A3652' }}
+            style={{ borderBottom: '1px solid var(--wt-border-strong)' }}
           >
             {[
               { id: 'workOrders', label: 'Work Orders' },
@@ -199,9 +201,9 @@ export default function UserDashboardPage() {
                   onClick={() => setActiveTab(tab.id)}
                   className="flex-grow-1 border-0 bg-transparent px-4 px-md-5 py-3"
                   style={{
-                    color: isActive ? '#FF8C42' : '#C5C3DA',
-                    borderBottom: isActive ? '2px solid #FF8C42' : '2px solid transparent',
-                    backgroundColor: isActive ? '#2A2740' : 'transparent',
+                    color: isActive ? 'var(--wt-accent-soft)' : 'var(--wt-text-muted)',
+                    borderBottom: isActive ? '2px solid var(--wt-accent-soft)' : '2px solid transparent',
+                    backgroundColor: isActive ? 'var(--wt-bg-surface-strong)' : 'transparent',
                   }}
                 >
                   {tab.label}
@@ -214,7 +216,7 @@ export default function UserDashboardPage() {
             {activeTab === 'workOrders' && (
               <div className="d-flex flex-column gap-4">
                 {dashboardError && (
-                  <p className="small" style={{ color: '#FF8C42' }}>
+                  <p className="small" style={{ color: 'var(--wt-accent-soft)' }}>
                     {dashboardError}
                   </p>
                 )}
@@ -239,8 +241,8 @@ export default function UserDashboardPage() {
                         key={item.id}
                         className="rounded-4 p-3 p-md-4"
                         style={{
-                          backgroundColor: '#2A2740',
-                          border: '1px solid #3A3652',
+                          backgroundColor: 'var(--wt-bg-surface-strong)',
+                          border: '1px solid var(--wt-border-strong)',
                         }}
                       >
                         <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-start gap-3">
@@ -302,8 +304,8 @@ export default function UserDashboardPage() {
                         key={item.id}
                         className="rounded-4 p-3 p-md-4"
                         style={{
-                          backgroundColor: '#2A2740',
-                          border: '1px solid #3A3652',
+                          backgroundColor: 'var(--wt-bg-surface-strong)',
+                          border: '1px solid var(--wt-border-strong)',
                         }}
                       >
                         <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-start gap-3">
@@ -361,7 +363,7 @@ export default function UserDashboardPage() {
             {activeTab === 'reviews' && (
               <div className="d-flex flex-column gap-3">
                 {dashboardError && (
-                  <p className="small" style={{ color: '#FF8C42' }}>
+                  <p className="small" style={{ color: 'var(--wt-accent-soft)' }}>
                     {dashboardError}
                   </p>
                 )}
@@ -379,8 +381,8 @@ export default function UserDashboardPage() {
                     key={rev.id}
                     className="rounded-4 p-3 p-md-4"
                     style={{
-                      backgroundColor: '#2A2740',
-                      border: '1px solid #3A3652',
+                      backgroundColor: 'var(--wt-bg-surface-strong)',
+                      border: '1px solid var(--wt-border-strong)',
                     }}
                   >
                     <div className="d-flex justify-content-between align-items-start mb-2">
@@ -402,8 +404,8 @@ export default function UserDashboardPage() {
                           size={16}
                           style={
                             idx < (rev.rating ?? 0)
-                              ? { color: '#FF8C42', fill: '#FF8C42' }
-                              : { color: '#3A3652' }
+                              ? { color: 'var(--wt-warning)', fill: 'var(--wt-warning)' }
+                              : { color: 'var(--wt-border-strong)' }
                           }
                         />
                       ))}
@@ -423,7 +425,7 @@ export default function UserDashboardPage() {
             {activeTab === 'receipts' && (
               <div className="d-flex flex-column gap-4">
                 {dashboardError && (
-                  <p className="small" style={{ color: '#FF8C42' }}>
+                  <p className="small" style={{ color: 'var(--wt-accent-soft)' }}>
                     {dashboardError}
                   </p>
                 )}
@@ -437,8 +439,8 @@ export default function UserDashboardPage() {
                         key={item.id}
                         className="rounded-4 p-3 p-md-4"
                         style={{
-                          backgroundColor: '#2A2740',
-                          border: '2px solid #FF8C42',
+                          backgroundColor: 'var(--wt-bg-surface-strong)',
+                          border: '2px solid var(--wt-accent-soft)',
                         }}
                       >
                         <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-start gap-3">
@@ -481,8 +483,8 @@ export default function UserDashboardPage() {
                         key={item.id}
                         className="rounded-4 p-3 p-md-4"
                         style={{
-                          backgroundColor: '#2A2740',
-                          border: '1px solid #3A3652',
+                          backgroundColor: 'var(--wt-bg-surface-strong)',
+                          border: '1px solid var(--wt-border-strong)',
                         }}
                       >
                         <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-start gap-3">
@@ -522,7 +524,7 @@ export default function UserDashboardPage() {
                   Saved Shops ({savedShops.length})
                 </h3>
                 {savedError && (
-                  <p className="small" style={{ color: '#FF8C42' }}>
+                  <p className="small" style={{ color: 'var(--wt-accent-soft)' }}>
                     {savedError}
                   </p>
                 )}
@@ -531,15 +533,15 @@ export default function UserDashboardPage() {
                     key={shop.id}
                     className="rounded-4 p-3 p-md-4 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3"
                     style={{
-                      backgroundColor: '#2A2740',
-                      border: '1px solid #3A3652',
+                      backgroundColor: 'var(--wt-bg-surface-strong)',
+                      border: '1px solid var(--wt-border-strong)',
                     }}
                   >
                     <div>
                       <h4 className="h6 text-white mb-1">{shop.name}</h4>
                       <div className="d-flex flex-wrap align-items-center gap-3 small wt-text-muted mb-1">
                         <div className="d-flex align-items-center gap-1">
-                          <LuStar size={16} style={{ color: '#FF8C42', fill: '#FF8C42' }} />
+                          <LuStar size={16} style={{ color: 'var(--wt-warning)', fill: 'var(--wt-warning)' }} />
                           <span className="text-white">
                             {shop.rating.toFixed(1)}
                           </span>

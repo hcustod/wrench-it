@@ -67,6 +67,7 @@ public class ReceiptController {
         var user = userService.getOrCreateFromJwt(jwt);
         try {
             byte[] fileBytes = file.getBytes();
+            // Scan before persisting so rejected files never touch receipt storage.
             clamAvService.assertClean(fileBytes);
             return portalDataService.createReceiptWithFile(user.getId(), request, fileBytes);
         } catch (java.io.IOException ex) {

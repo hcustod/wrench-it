@@ -76,6 +76,7 @@ public class AuthController {
         try {
             keycloakAuthService.initiatePasswordReset(request.email);
         } catch (ResponseStatusException ignored) {
+            // Keep the response intentionally vague so the endpoint does not reveal whether the email exists.
         }
         return ResponseEntity.ok(Map.of(
                 "message", "If an account exists for that email, a password reset link has been sent."
@@ -101,6 +102,7 @@ public class AuthController {
         long refreshTtl = asPositiveLong(tokenPayload.get("refresh_expires_in"), 2_592_000L);
 
         HttpHeaders headers = new HttpHeaders();
+        // Scope the refresh cookie to auth endpoints since it is only used for refresh/logout flows.
         headers.add(HttpHeaders.SET_COOKIE, buildCookie(accessTokenCookieName, accessToken, accessTtl, "/"));
         headers.add(HttpHeaders.SET_COOKIE, buildCookie(refreshTokenCookieName, refreshToken, refreshTtl, "/api/auth"));
 

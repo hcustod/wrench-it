@@ -1,0 +1,25 @@
+localhost {
+    reverse_proxy www:80
+}
+
+api.localhost {
+    reverse_proxy api:8080
+}
+
+auth.localhost {
+    reverse_proxy keycloak:8080
+}
+
+# Production template. Replace MY_DOMAIN_HERE after you provide the real domain.
+#
+# MY_DOMAIN_HERE {
+#     reverse_proxy www:80
+# }
+#
+# api.MY_DOMAIN_HERE {
+#     reverse_proxy api:8080
+# }
+#
+# auth.MY_DOMAIN_HERE {
+#     reverse_proxy keycloak:8080
+# }

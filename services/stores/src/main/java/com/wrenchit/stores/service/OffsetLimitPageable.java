@@ -33,6 +33,7 @@ final class OffsetLimitPageable implements Pageable, Serializable {
 
     @Override
     public int getPageNumber() {
+        // Spring Data still asks for a page number even though this search flow is offset/limit based.
         return offset / limit;
     }
 

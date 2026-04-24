@@ -149,6 +149,7 @@ public class StoreService {
             }
         } else if (!hasRadius && googlePlacesProperties.isEnabled() && hasGoogleApiKeyConfigured()) {
             try {
+                // Ask Google for enough rows to cover the requested page before local filters trim the list down.
                 int requestedLimit = Math.min(Math.max(limit + offset, limit), 100);
                 List<PlaceSearchResult> places = placesClient.search(query, requestedLimit, openNow);
                 List<String> placeIds = new ArrayList<>();
@@ -166,6 +167,7 @@ public class StoreService {
                 total = stores.size();
                 stores = paginate(stores, offset, limit);
             } catch (RuntimeException ex) {
+                // Search should still return something even if the external lookup is unavailable.
                 log.warn(
                         "Google Places search failed; falling back to local search. query='{}', reason='{}'",
                         query,
@@ -284,6 +286,7 @@ public class StoreService {
                 : getPriceRangesByIds(extractIds(stores));
         List<Store> filtered = new ArrayList<>();
         for (Store store : stores) {
+            // Google-backed matches still have to respect the app's own filters before they reach the UI.
             if (minRating != null && (store.getRating() == null || store.getRating() < minRating)) {
                 continue;
             }
@@ -417,6 +420,7 @@ public class StoreService {
             return List.of();
         }
 
+        // Manual pagination is only needed after the in-memory filtering paths.
         int safeOffset = Math.max(offset, 0);
         int safeLimit = Math.max(limit, 1);
         if (safeOffset >= stores.size()) {

@@ -177,7 +177,7 @@ export default function ShopOwnerDashboardPage() {
           Manage your shop profile, work orders, services, and customer reviews.
         </p>
         {error && (
-          <p className="small mt-2 mb-0" style={{ color: '#FF8C42' }}>
+          <p className="small mt-2 mb-0" style={{ color: 'var(--wt-accent-soft)' }}>
             {error}
           </p>
         )}
@@ -188,14 +188,14 @@ export default function ShopOwnerDashboardPage() {
           <div
             className="wt-card"
             style={{
-              borderColor: approvalStatus === 'REJECTED' ? 'rgba(248,113,113,0.55)' : 'rgba(255,140,66,0.55)',
-              backgroundColor: approvalStatus === 'REJECTED' ? 'rgba(127,29,29,0.35)' : 'rgba(255,140,66,0.12)',
+              borderColor: approvalStatus === 'REJECTED' ? 'var(--wt-danger-border)' : 'var(--wt-accent-border)',
+              backgroundColor: approvalStatus === 'REJECTED' ? 'var(--wt-danger-bg)' : 'var(--wt-accent-bg)',
             }}
           >
             <div className="d-flex align-items-start gap-3">
               <LuTriangleAlert
                 size={20}
-                style={{ color: approvalStatus === 'REJECTED' ? '#f87171' : '#FF8C42', flexShrink: 0 }}
+                style={{ color: approvalStatus === 'REJECTED' ? 'var(--wt-danger)' : 'var(--wt-accent-soft)', flexShrink: 0 }}
               />
               <div>
                 <div className="text-white mb-1">
@@ -279,7 +279,7 @@ export default function ShopOwnerDashboardPage() {
                 <div className="d-flex justify-content-between align-items-center py-2 border-bottom border-opacity-25 border-secondary">
                   <span className="wt-text-muted small">Rating</span>
                   <div className="d-flex align-items-center gap-2">
-                    <LuStar size={16} style={{ color: '#FF8C42', fill: '#FF8C42' }} />
+                    <LuStar size={16} style={{ color: 'var(--wt-warning)', fill: 'var(--wt-warning)' }} />
                     <span className="text-white">{Number(shopProfile.rating ?? 0).toFixed(1)}</span>
                     <span className="wt-text-muted small">
                       ({shopProfile.reviewCount ?? 0} reviews)
@@ -320,8 +320,8 @@ export default function ShopOwnerDashboardPage() {
                     key={workOrder.id}
                     className="rounded-4 p-3 p-md-4"
                     style={{
-                      backgroundColor: '#2A2740',
-                      border: '1px solid #3A3652',
+                      backgroundColor: 'var(--wt-bg-surface-strong)',
+                      border: '1px solid var(--wt-border-strong)',
                     }}
                   >
                     <div className="d-flex flex-column flex-md-row justify-content-between gap-3">
@@ -399,8 +399,8 @@ export default function ShopOwnerDashboardPage() {
                     key={service.name}
                     className="rounded-4 p-3 p-md-4 d-flex justify-content-between align-items-center"
                     style={{
-                      backgroundColor: '#2A2740',
-                      border: '1px solid #3A3652',
+                      backgroundColor: 'var(--wt-bg-surface-strong)',
+                      border: '1px solid var(--wt-border-strong)',
                     }}
                   >
                     <div>
@@ -436,8 +436,8 @@ export default function ShopOwnerDashboardPage() {
                     key={review.id}
                     className="rounded-4 p-3 p-md-4"
                     style={{
-                      backgroundColor: '#2A2740',
-                      border: '1px solid #3A3652',
+                      backgroundColor: 'var(--wt-bg-surface-strong)',
+                      border: '1px solid var(--wt-border-strong)',
                     }}
                   >
                     <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 mb-2">
@@ -454,8 +454,8 @@ export default function ShopOwnerDashboardPage() {
                             size={16}
                             style={
                               idx < (review.rating ?? 0)
-                                ? { color: '#FF8C42', fill: '#FF8C42' }
-                                : { color: '#3A3652' }
+                                ? { color: 'var(--wt-warning)', fill: 'var(--wt-warning)' }
+                                : { color: 'var(--wt-border-strong)' }
                             }
                           />
                         ))}
@@ -466,8 +466,8 @@ export default function ShopOwnerDashboardPage() {
                       <div
                         className="rounded-4 p-3 mt-2"
                         style={{
-                          backgroundColor: 'rgba(108,99,255,0.12)',
-                          border: '1px solid rgba(108,99,255,0.4)',
+                          backgroundColor: 'var(--wt-accent-bg)',
+                          border: '1px solid var(--wt-accent-border)',
                         }}
                       >
                         <p className="text-white small mb-1 d-flex align-items-center gap-2">
@@ -506,7 +506,7 @@ export default function ShopOwnerDashboardPage() {
             <div
               className="wt-card"
               style={{
-                borderColor: 'rgba(255,140,66,0.6)',
+                borderColor: 'var(--wt-accent-border)',
               }}
             >
               <h3 className="h6 text-white mb-3">Quick actions</h3>
@@ -538,8 +538,8 @@ export default function ShopOwnerDashboardPage() {
             <div
               className="wt-card"
               style={{
-                backgroundColor: 'rgba(108,99,255,0.12)',
-                borderColor: 'rgba(108,99,255,0.5)',
+                backgroundColor: 'var(--wt-accent-bg)',
+                borderColor: 'var(--wt-accent-border)',
               }}
             >
               <h3 className="h6 text-white mb-3 d-flex align-items-center gap-2">

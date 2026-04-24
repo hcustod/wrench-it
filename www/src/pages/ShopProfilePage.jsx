@@ -1,10 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { LuStar, LuMapPin, LuPhone, LuClock, LuArrowRight } from 'react-icons/lu';
+import { LuArrowRight, LuClock, LuMapPin, LuPhone, LuShield, LuStar, LuX } from 'react-icons/lu';
 import { getStore, listStoreServices } from '../api/stores.js';
 import { listReviews } from '../api/reviews.js';
 import { listSavedShopsIfAuthenticated, saveShop, unsaveShop } from '../api/saved.js';
 import ReviewCard from '../components/review/ReviewCard.jsx';
+import { loadGoogleMaps, resolveMapsApiKey } from '../lib/googleMaps.js';
+
+const DAY_ORDER = [
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+  'Sunday',
+];
 
 function formatDate(value) {
   if (!value) return '-';
@@ -38,36 +49,113 @@ function formatHoursWindow(hours) {
   return close ? `${open} - ${close}` : open;
 }
 
-function resolveMapsApiKey() {
-  const fromRuntime = window.WRENCHIT_CONFIG?.googleMapsApiKey;
-  if (fromRuntime && fromRuntime.trim()) return fromRuntime.trim();
-  const fromVite = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-  if (fromVite && fromVite.trim()) return fromVite.trim();
-  return '';
+function buildAddressLabel(shop, includeCountry = false) {
+  return [
+    shop?.address,
+    shop?.city,
+    shop?.state,
+    shop?.postalCode,
+    includeCountry ? shop?.country : null,
+  ].filter(Boolean).join(', ') || shop?.location || 'Location unavailable';
 }
 
-async function loadGoogleMaps(apiKey) {
-  if (window.google?.maps) return;
-  if (!apiKey) throw new Error('Google Maps API key is missing.');
+function normalizeWebsite(url) {
+  if (typeof url !== 'string' || !url.trim()) return '';
+  const trimmed = url.trim();
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
 
-  if (!window.__wrenchitGoogleMapsLoader) {
-    window.__wrenchitGoogleMapsLoader = new Promise((resolve, reject) => {
-      const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}`;
-      script.async = true;
-      script.defer = true;
-      script.onload = resolve;
-      script.onerror = () => reject(new Error('Failed to load Google Maps script.'));
-      document.head.appendChild(script);
-    });
+function pickReviewerName(review) {
+  if (typeof review?.reviewerName === 'string' && review.reviewerName.trim()) {
+    return review.reviewerName.trim();
+  }
+  if (typeof review?.displayName === 'string' && review.displayName.trim()) {
+    return review.displayName.trim();
+  }
+  if (typeof review?.authorName === 'string' && review.authorName.trim()) {
+    return review.authorName.trim();
+  }
+  return 'Customer';
+}
+
+function joinNaturalList(items) {
+  if (!Array.isArray(items) || items.length === 0) return '';
+  if (items.length === 1) return items[0];
+  if (items.length === 2) return `${items[0]} and ${items[1]}`;
+  return `${items.slice(0, -1).join(', ')}, and ${items.at(-1)}`;
+}
+
+function buildShopBlurb(shop, highlights) {
+  const name = shop?.name || 'This shop';
+  const location = shop?.city && shop?.state
+    ? `${shop.city}, ${shop.state}`
+    : (shop?.location || 'the local area');
+  const servicesText = String(shop?.servicesText || '').toLowerCase();
+  const topHighlights = highlights.filter(Boolean).slice(0, 3);
+
+  const intro = typeof shop?.rating === 'number' && shop.rating > 0 && typeof shop?.reviewCount === 'number' && shop.reviewCount > 0
+    ? `${name} is one of the stronger-rated options in ${location}, holding ${shop.rating.toFixed(1)} stars across ${shop.reviewCount} reviews.`
+    : `${name} stands out as a dependable option in ${location} for drivers who want a straightforward place to get work done.`;
+
+  const services = topHighlights.length > 0
+    ? `${name} is especially worth a look for ${joinNaturalList(topHighlights).toLowerCase()}, with more listed service coverage and pricing shown below.`
+    : `${name} looks geared toward practical everyday repair, inspection, and maintenance work rather than a bloated service menu.`;
+
+  let closer = `${name} comes across as an easy shop to shortlist if you want clear location, service, and review information in one place.`;
+  if (servicesText.includes('mobile')) {
+    closer = `${name} looks particularly useful if you want flexible mobile help without restarting your search from scratch.`;
+  } else if (servicesText.includes('collision') || servicesText.includes('paint') || servicesText.includes('glass')) {
+    closer = `${name} looks especially relevant for specialty body, glass, or collision work where convenience and trust matter.`;
+  } else if (servicesText.includes('oil') || servicesText.includes('brake') || servicesText.includes('diagnostic')) {
+    closer = `${name} looks like a strong fit for routine maintenance and quick issue-checking when you just need the basics handled well.`;
   }
 
-  await window.__wrenchitGoogleMapsLoader;
+  return `${intro} ${services} ${closer}`;
+}
+
+function syncMapInstance(host, mapRef, markerRef, center, title, zoom) {
+  if (!host || !window.google?.maps || !center) return;
+
+  if (!mapRef.current || mapRef.current.getDiv?.() !== host) {
+    mapRef.current = new window.google.maps.Map(host, {
+      center,
+      zoom,
+      mapTypeControl: false,
+      streetViewControl: false,
+      fullscreenControl: false,
+      gestureHandling: 'cooperative',
+      clickableIcons: false,
+    });
+  } else {
+    mapRef.current.setCenter(center);
+    mapRef.current.setZoom(zoom);
+  }
+
+  if (markerRef.current) {
+    markerRef.current.setMap(null);
+  }
+
+  markerRef.current = new window.google.maps.Marker({
+    map: mapRef.current,
+    position: center,
+    title: title || 'Shop',
+  });
+}
+
+function buildDirectionsUrl(shop, resolvedCoords) {
+  const lat = resolvedCoords?.lat ?? shop?.lat;
+  const lng = resolvedCoords?.lng ?? shop?.lng;
+  if (lat != null && lng != null && !Number.isNaN(Number(lat)) && !Number.isNaN(Number(lng))) {
+    return `https://www.google.com/maps/dir/?api=1&destination=${Number(lat)},${Number(lng)}`;
+  }
+
+  const address = buildAddressLabel(shop, true);
+  if (!address) return '';
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
 }
 
 export default function ShopProfilePage() {
   const { id } = useParams();
-  const [activeTab, setActiveTab] = useState('overview');
   const [shop, setShop] = useState(null);
   const [services, setServices] = useState([]);
   const [customerReviews, setCustomerReviews] = useState([]);
@@ -78,9 +166,14 @@ export default function ShopProfilePage() {
   const [savingShop, setSavingShop] = useState(false);
   const [mapStatus, setMapStatus] = useState('');
   const [resolvedCoords, setResolvedCoords] = useState(null);
-  const mapHostRef = useRef(null);
-  const mapRef = useRef(null);
-  const mapMarkerRef = useRef(null);
+  const [isMapExpanded, setIsMapExpanded] = useState(false);
+
+  const inlineMapHostRef = useRef(null);
+  const expandedMapHostRef = useRef(null);
+  const inlineMapRef = useRef(null);
+  const expandedMapRef = useRef(null);
+  const inlineMapMarkerRef = useRef(null);
+  const expandedMapMarkerRef = useRef(null);
   const mapsApiKey = useMemo(() => resolveMapsApiKey(), []);
 
   useEffect(() => {
@@ -100,18 +193,16 @@ export default function ShopProfilePage() {
         setShop(normalizeStore(storeRes));
         setServices(servicesRes ?? []);
 
-        const apiReviews = (reviewsRes ?? []).map((rev) => ({
-          id: rev.id,
-          reviewerName:
-            typeof rev.reviewerName === 'string' && rev.reviewerName.trim()
-              ? rev.reviewerName
-              : 'Customer',
-          rating: Number(rev.rating ?? 0),
-          reviewText: rev.comment,
-          ownerResponse: rev.ownerResponse ?? '',
-          ownerResponseBy: rev.ownerResponseBy ?? 'Shop Owner',
-          verificationStatus: rev.verificationStatus ?? 'UNVERIFIED',
-          date: formatDate(rev.createdAt),
+        // Normalize review shape here so the card component can stay dumb and presentation-focused.
+        const apiReviews = (reviewsRes ?? []).map((review) => ({
+          id: review.id,
+          reviewerName: pickReviewerName(review),
+          rating: Number(review.rating ?? 0),
+          reviewText: review.comment,
+          ownerResponse: review.ownerResponse ?? '',
+          ownerResponseBy: review.ownerResponseBy ?? 'Shop Owner',
+          verificationStatus: review.verificationStatus ?? 'UNVERIFIED',
+          date: formatDate(review.createdAt),
         }));
         setCustomerReviews(apiReviews);
       } catch (err) {
@@ -145,9 +236,9 @@ export default function ShopProfilePage() {
           if (!cancelled) setIsSaved(false);
           return;
         }
+
         if (cancelled) return;
-        const matches = (saved ?? []).some((entry) => entry?.store?.id === id);
-        setIsSaved(matches);
+        setIsSaved((saved ?? []).some((entry) => entry?.store?.id === id));
       } catch {
         if (!cancelled) {
           setIsSaved(false);
@@ -161,21 +252,15 @@ export default function ShopProfilePage() {
     };
   }, [id]);
 
-  const hoursRows = useMemo(() => {
-    if (!shop?.hours || typeof shop.hours !== 'object') {
-      return [];
-    }
-
-    return Object.entries(shop.hours)
-      .map(([day, value]) => ({
+  const hoursRows = useMemo(() => DAY_ORDER
+    .map((day) => {
+      const value = shop?.hours?.[day];
+      return {
         day,
-        value:
-          typeof value === 'string'
-            ? value
-            : formatHoursWindow(value),
-      }))
-      .filter((item) => item.value);
-  }, [shop]);
+        value: typeof value === 'string' ? value : formatHoursWindow(value),
+      };
+    })
+    .filter((item) => item.value), [shop?.hours]);
 
   const fallbackServiceTags = useMemo(
     () =>
@@ -186,39 +271,55 @@ export default function ShopProfilePage() {
     [shop?.servicesText],
   );
 
-  useEffect(() => {
-    setResolvedCoords(null);
-  }, [shop?.id, shop?.lat, shop?.lng, shop?.address, shop?.city, shop?.state, shop?.postalCode, shop?.country]);
+  const serviceHighlights = useMemo(() => {
+    const structured = services
+      .map((service) => service?.name)
+      .filter(Boolean);
+    return (structured.length > 0 ? structured : fallbackServiceTags).slice(0, 6);
+  }, [fallbackServiceTags, services]);
 
   useEffect(() => {
-    let disposed = false;
+    if (!isMapExpanded) return undefined;
 
-    async function initMap() {
-      if (activeTab !== 'overview' || !mapHostRef.current) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isMapExpanded]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function ensureMap() {
+      if (!shop) return;
+      if (!inlineMapHostRef.current) return;
+
       if (!mapsApiKey) {
-        setMapStatus('Google Maps key is missing. Add it to www/public/config.js and rebuild the www container.');
+        setResolvedCoords(null);
+        setMapStatus('Add a Google Maps API key in `www/public/config.js` to render the live map for this shop.');
         return;
       }
 
       try {
         setMapStatus('Loading map...');
         await loadGoogleMaps(mapsApiKey);
-        if (disposed) return;
+        if (cancelled) return;
 
         let center = null;
-        if (shop?.lat != null && shop?.lng != null) {
+        if (shop.lat != null && shop.lng != null) {
           center = { lat: Number(shop.lat), lng: Number(shop.lng) };
         } else {
-          const address = [shop?.address, shop?.city, shop?.state, shop?.postalCode, shop?.country]
-            .filter(Boolean)
-            .join(', ');
+          // Older or imported shops may only have an address, so geocode on the fly for the profile map.
+          const address = buildAddressLabel(shop, true);
           if (!address) {
-            setMapStatus('Shop location coordinates are unavailable.');
             setResolvedCoords(null);
+            setMapStatus('Shop location coordinates are unavailable.');
             return;
           }
 
-          setMapStatus('Resolving map location...');
+          setMapStatus('Resolving location...');
           const geocoder = new window.google.maps.Geocoder();
           center = await new Promise((resolve) => {
             geocoder.geocode({ address }, (results, status) => {
@@ -227,63 +328,60 @@ export default function ShopProfilePage() {
                 resolve({ lat: point.lat(), lng: point.lng() });
                 return;
               }
+
               resolve(null);
             });
           });
+
+          if (cancelled) return;
+
           if (!center) {
-            setMapStatus('Unable to resolve this shop address on Google Maps.');
             setResolvedCoords(null);
+            setMapStatus('Unable to resolve this shop address on Google Maps.');
             return;
           }
-          setResolvedCoords(center);
         }
 
-        if (!mapRef.current || mapRef.current.getDiv?.() !== mapHostRef.current) {
-          mapRef.current = new window.google.maps.Map(mapHostRef.current, {
-            center,
-            zoom: 14,
-            mapTypeControl: false,
-            streetViewControl: false,
-            fullscreenControl: true,
-          });
-        } else {
-          mapRef.current.setCenter(center);
-        }
+        if (cancelled) return;
 
-        if (mapMarkerRef.current) {
-          mapMarkerRef.current.setMap(null);
-        }
-        mapMarkerRef.current = new window.google.maps.Marker({
-          map: mapRef.current,
-          position: center,
-          title: shop.name || 'Shop',
-        });
+        setResolvedCoords(center);
         setMapStatus('');
-        if (shop?.lat != null && shop?.lng != null) {
-          setResolvedCoords({ lat: Number(shop.lat), lng: Number(shop.lng) });
+        syncMapInstance(
+          inlineMapHostRef.current,
+          inlineMapRef,
+          inlineMapMarkerRef,
+          center,
+          shop.name,
+          14,
+        );
+
+        if (isMapExpanded && expandedMapHostRef.current) {
+          syncMapInstance(
+            expandedMapHostRef.current,
+            expandedMapRef,
+            expandedMapMarkerRef,
+            center,
+            shop.name,
+            15,
+          );
         }
       } catch {
-        if (!disposed) {
+        if (!cancelled) {
+          setResolvedCoords(null);
           setMapStatus('Could not load Google Maps API. Check key, billing, and localhost referrer restrictions.');
         }
       }
     }
 
-    initMap();
+    void ensureMap();
+
     return () => {
-      disposed = true;
+      cancelled = true;
     };
   }, [
-    activeTab,
-    shop?.lat,
-    shop?.lng,
-    shop?.name,
-    shop?.address,
-    shop?.city,
-    shop?.state,
-    shop?.postalCode,
-    shop?.country,
+    isMapExpanded,
     mapsApiKey,
+    shop,
   ]);
 
   if (loading && !shop) {
@@ -302,17 +400,19 @@ export default function ShopProfilePage() {
     );
   }
 
-  const fullStars = Math.floor(shop.rating ?? 0);
+  const fullStars = Math.round(shop.rating ?? 0);
+  const averageRatingLabel = shop.reviewCount > 0 ? Number(shop.rating ?? 0).toFixed(1) : 'New';
+  const reviewCountLabel = `${shop.reviewCount} ${shop.reviewCount === 1 ? 'review' : 'reviews'}`;
   const hasCoordinates = resolvedCoords?.lat != null && resolvedCoords?.lng != null;
+  const displayAddress = buildAddressLabel(shop, false);
+  const directionsUrl = buildDirectionsUrl(shop, resolvedCoords);
   const dialPhone = typeof shop.phone === 'string'
     ? shop.phone.replace(/[^\d+]/g, '')
     : '';
-  const directionsTarget = hasCoordinates
-    ? `${resolvedCoords.lat},${resolvedCoords.lng}`
-    : [shop.address, shop.city, shop.state, shop.postalCode].filter(Boolean).join(', ');
-  const directionsUrl = directionsTarget
-    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(directionsTarget)}`
-    : '';
+  const websiteUrl = normalizeWebsite(shop.website);
+  const aboutText = typeof shop.description === 'string' && shop.description.trim()
+    ? shop.description.trim()
+    : buildShopBlurb(shop, serviceHighlights);
 
   async function handleToggleSaveShop() {
     if (!shop?.id || savingShop) return;
@@ -342,368 +442,432 @@ export default function ShopProfilePage() {
 
   return (
     <>
-      
-      <section className="mb-4">
-        <div className="wt-card">
-          <div className="d-flex flex-column flex-md-row justify-content-between align-items-start gap-4">
-            <div className="flex-grow-1">
-              <h1 className="mb-3">{shop.name}</h1>
+      <section className="wt-shop-page">
+        <div className="wt-shop-hero-card">
+          <div className="wt-shop-hero-grid">
+            <div className="wt-shop-hero-copy">
+              <span className="wt-home-section-label">Shop Profile</span>
+              <h1 className="wt-shop-title">{shop.name}</h1>
 
-              <div className="d-flex flex-wrap align-items-center gap-3 mb-3">
-                <div className="d-flex align-items-center gap-2">
-                  <div className="d-flex align-items-center gap-1">
-                    {Array.from({ length: 5 }).map((_, idx) => (
-                      <LuStar
-                        key={idx}
-                        size={20}
-                        style={
-                          idx < fullStars
-                            ? { color: '#FF8C42', fill: '#FF8C42' }
-                            : { color: '#3A3652' }
-                        }
-                      />
-                    ))}
-                  </div>
-                  <span className="text-white">{Number(shop.rating ?? 0).toFixed(1)}</span>
+              <div className="wt-shop-rating-row">
+                <div className="d-flex align-items-center gap-1">
+                  {Array.from({ length: 5 }).map((_, index) => (
+                    <LuStar
+                      key={`star-${index}`}
+                      size={18}
+                      style={
+                        index < fullStars
+                          ? { color: 'var(--wt-warning)', fill: 'var(--wt-warning)' }
+                          : { color: 'var(--wt-border-strong)' }
+                      }
+                    />
+                  ))}
                 </div>
-                <span className="wt-text-muted small">({shop.reviewCount} reviews)</span>
+                <strong>{averageRatingLabel}</strong>
+                <span className="wt-text-muted small">{reviewCountLabel}</span>
               </div>
 
-              <div className="d-flex flex-column gap-2 wt-text-muted small">
-                <div className="d-flex align-items-center gap-2">
-                  <LuMapPin size={18} />
-                  <span>{shop.address ?? shop.location}</span>
+              <div className="wt-shop-pill-row">
+                <span className="wt-shop-info-pill">
+                  <LuMapPin size={16} />
+                  <span>{shop.location}</span>
+                </span>
+                <span className="wt-shop-info-pill">
+                  <LuClock size={16} />
+                  <span>{hoursRows.length > 0 ? 'Hours listed below' : 'Hours not listed'}</span>
+                </span>
+                <span className="wt-shop-info-pill">
+                  <LuShield size={16} />
+                  <span>Receipt-backed reviews supported</span>
+                </span>
+              </div>
+
+              <p className="wt-shop-summary mb-0">{aboutText}</p>
+
+              <div className="wt-shop-stat-grid">
+                <div className="wt-shop-stat-card">
+                  <span className="wt-shop-stat-label">Price band</span>
+                  <strong>{shop.priceRange ?? 'N/A'}</strong>
                 </div>
-                <div className="d-flex align-items-center gap-2">
-                  <LuPhone size={18} />
-                  <span>{shop.phone ?? 'Phone unavailable'}</span>
+                <div className="wt-shop-stat-card">
+                  <span className="wt-shop-stat-label">Services listed</span>
+                  <strong>{services.length || serviceHighlights.length || 0}</strong>
                 </div>
-                <div className="d-flex align-items-center gap-2">
-                  <LuClock size={18} />
-                  <span>
-                    {hoursRows.length > 0 ? 'See hours below' : 'Hours information unavailable'}
-                  </span>
+                <div className="wt-shop-stat-card">
+                  <span className="wt-shop-stat-label">Map state</span>
+                  <strong>{hasCoordinates ? 'Ready' : 'Resolving'}</strong>
                 </div>
               </div>
-            </div>
 
-            <div className="d-flex flex-column gap-2">
-              <Link
-                to={`/request-work-order?storeId=${shop.id}`}
-                className="btn btn-wt-primary text-center"
-              >
-                Request Work Order
-              </Link>
-              {dialPhone ? (
-                <a href={`tel:${dialPhone}`} className="btn btn-wt-orange text-center">
-                  Call Shop
-                </a>
-              ) : (
-                <button type="button" className="btn btn-wt-orange" disabled>
-                  Call Shop
-                </button>
-              )}
-              {directionsUrl ? (
-                <a
-                  href={directionsUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="btn btn-wt-outline text-center"
+              <div className="wt-shop-action-stack">
+                <Link
+                  to={`/request-work-order?storeId=${shop.id}`}
+                  className="btn btn-wt-primary"
                 >
-                  Get Directions
-                </a>
-              ) : (
-                <button type="button" className="btn btn-wt-outline" disabled>
-                  Get Directions
+                  Request Work Order
+                </Link>
+
+                {dialPhone ? (
+                  <a href={`tel:${dialPhone}`} className="btn btn-wt-orange">
+                    Call Shop
+                  </a>
+                ) : (
+                  <button type="button" className="btn btn-wt-orange" disabled>
+                    Phone unavailable
+                  </button>
+                )}
+
+                {directionsUrl ? (
+                  <a
+                    href={directionsUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="btn btn-wt-outline"
+                  >
+                    Get Directions
+                  </a>
+                ) : (
+                  <button type="button" className="btn btn-wt-outline" disabled>
+                    Get Directions
+                  </button>
+                )}
+
+                <Link to={`/write-review?storeId=${shop.id}`} className="btn btn-wt-outline">
+                  Write Review
+                </Link>
+
+                <button
+                  type="button"
+                  className="btn btn-wt-outline"
+                  onClick={handleToggleSaveShop}
+                  disabled={savingShop}
+                >
+                  {savingShop ? 'Saving...' : isSaved ? 'Saved to Dashboard' : 'Save Shop'}
                 </button>
-              )}
-              <Link
-                to={`/write-review?storeId=${shop.id}`}
-                className="btn btn-sm btn-wt-outline text-center"
-              >
-                Write Review
-              </Link>
-              <button
-                type="button"
-                className="btn btn-sm btn-wt-outline"
-                onClick={handleToggleSaveShop}
-                disabled={savingShop}
-              >
-                {savingShop ? 'Saving...' : isSaved ? 'Saved' : 'Save Shop'}
-              </button>
+              </div>
+
               {saveMessage && (
-                <div className="small wt-text-muted text-center">
+                <div className="wt-shop-inline-note">
                   {saveMessage}
                 </div>
               )}
             </div>
-          </div>
-        </div>
-      </section>
 
-      
-      <section>
-        <div className="wt-card p-0">
-          
-          <div
-            className="d-flex"
-            style={{ borderBottom: '1px solid #3A3652' }}
-          >
-            {[
-              { id: 'overview', label: 'Overview' },
-              { id: 'services', label: 'Services' },
-              { id: 'reviews', label: 'Reviews' },
-            ].map((tab) => {
-              const isActive = activeTab === tab.id;
-              return (
+            <aside className="wt-shop-map-card">
+              <div className="wt-shop-panel-heading">
+                <div>
+                  <span className="wt-home-section-label">Store Map</span>
+                  <h2>Location at a glance</h2>
+                </div>
+
                 <button
-                  key={tab.id}
                   type="button"
-                  onClick={() => setActiveTab(tab.id)}
-                  className="flex-grow-1 border-0 bg-transparent px-4 px-md-5 py-3"
-                  style={{
-                    color: isActive ? '#FF8C42' : '#C5C3DA',
-                    borderBottom: isActive ? '2px solid #FF8C42' : '2px solid transparent',
-                    backgroundColor: isActive ? '#2A2740' : 'transparent',
-                  }}
+                  className="btn btn-sm btn-wt-outline"
+                  onClick={() => setIsMapExpanded(true)}
+                  disabled={!hasCoordinates}
                 >
-                  {tab.label}
+                  Expand Map
                 </button>
-              );
-            })}
-          </div>
-
-          
-          <div className="p-4 p-md-5">
-            {error && (
-              <div className="small mb-3" style={{ color: '#FF8C42' }}>
-                {error}
               </div>
-            )}
-            {activeTab === 'overview' && (
-              <div className="d-flex flex-column gap-4">
-                
-                <div>
-                  <h3 className="h5 text-white mb-3">About This Shop</h3>
-                  <p className="wt-text-muted mb-0">
-                    {shop.description ??
-                      'Shop profile details are sourced from live store data.'}
-                  </p>
-                </div>
 
-                
-                <div>
-                  <h3 className="h5 text-white mb-3">Hours of Operation</h3>
-                  <div
-                    className="rounded-4 p-3 p-md-4"
-                    style={{ backgroundColor: '#2A2740', border: '1px solid #3A3652' }}
-                  >
-                    {hoursRows.map((item, idx) => (
-                      <div
-                        key={item.day}
-                        className="d-flex justify-content-between py-1 small"
-                        style={{
-                          borderBottom:
-                            idx !== hoursRows.length - 1 ? '1px solid #3A3652' : 'none',
-                        }}
-                      >
-                        <span className="text-white">{item.day}</span>
-                        <span className="wt-text-muted">{item.value}</span>
-                      </div>
-                    ))}
-                    {hoursRows.length === 0 && (
-                      <p className="wt-text-muted small mb-0">Hours not available.</p>
-                    )}
-                  </div>
-                </div>
-
-                
-                <div>
-                  <h3 className="h5 text-white mb-3">Location</h3>
-                  <div style={{ position: 'relative' }}>
-                    <div
-                      ref={mapHostRef}
-                      className="rounded-4"
-                      style={{ backgroundColor: '#2A2740', border: '1px solid #3A3652', height: '16rem' }}
-                    />
-                    {mapStatus && (
-                      <div
-                        className="rounded-4 d-flex align-items-center justify-content-center"
-                        style={{
-                          position: 'absolute',
-                          inset: 0,
-                          backgroundColor: 'rgba(42, 39, 64, 0.92)',
-                        }}
-                      >
-                        <p className="wt-text-muted mb-0 px-3 text-center">{mapStatus}</p>
-                      </div>
-                    )}
-                    {!mapStatus && !hasCoordinates && (
-                      <div
-                        className="rounded-4 d-flex align-items-center justify-content-center"
-                        style={{
-                          position: 'absolute',
-                          inset: 0,
-                          backgroundColor: 'rgba(42, 39, 64, 0.92)',
-                        }}
-                      >
-                        <div className="text-center">
-                          <LuMapPin className="wt-text-muted mb-2" size={40} />
-                          <p className="wt-text-muted mb-0">Map showing shop location</p>
-                        </div>
-                      </div>
-                    )}
-                    {hasCoordinates ? (
-                      <div className="small wt-text-muted mt-2">
-                        {Number(resolvedCoords.lat).toFixed(6)}, {Number(resolvedCoords.lng).toFixed(6)}
-                      </div>
-                    ) : (
-                      <div className="small wt-text-muted mt-2">
-                        Coordinates unavailable for this shop.
-                      </div>
-                    )}
-                    <div className="small wt-text-muted mt-1">
-                      {shop.address ?? shop.location}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'services' && (
-              <div>
-                <div className="d-flex justify-content-between align-items-center mb-3">
-                  <h3 className="h5 text-white mb-0">Services &amp; Pricing</h3>
-                  <Link
-                    to="/compare"
-                    className="d-flex align-items-center gap-1"
-                    style={{ color: '#FF8C42', textDecoration: 'none' }}
-                  >
-                    <span className="small">Compare Prices</span>
-                    <LuArrowRight size={16} />
-                  </Link>
-                </div>
-
-                <div
-                  className="rounded-4 overflow-hidden"
-                  style={{ backgroundColor: '#2A2740', border: '1px solid #3A3652' }}
-                >
-                  <table
-                    className="w-100 mb-0"
-                    style={{ borderCollapse: 'collapse' }}
-                  >
-                    <thead
-                      style={{ backgroundColor: '#242133', borderBottom: '1px solid #3A3652' }}
-                    >
-                      <tr className="small text-white">
-                        <th className="px-4 py-3 text-start">Service</th>
-                        <th className="px-4 py-3 text-start">Price</th>
-                        <th className="px-4 py-3 text-start">Duration</th>
-                        <th className="px-4 py-3 text-start">Category</th>
-                        <th className="px-4 py-3 text-start" />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {services.map((svc, idx) => (
-                        <tr
-                          key={svc.id}
-                          className="small"
-                          style={{
-                            borderBottom:
-                              idx !== services.length - 1 ? '1px solid #3A3652' : 'none',
-                          }}
-                        >
-                          <td className="px-4 py-3 text-white">{svc.name}</td>
-                          <td className="px-4 py-3 text-white">
-                            {typeof svc.price === 'number' ? `$${svc.price}` : 'Call'}
-                          </td>
-                          <td className="px-4 py-3 wt-text-muted">
-                            {svc.duration}
-                          </td>
-                          <td className="px-4 py-3">
-                            <span
-                              style={{
-                                padding: '0.25rem 0.75rem',
-                                borderRadius: '0.75rem',
-                                backgroundColor: 'rgba(255,140,66,0.18)',
-                                border: '1px solid rgba(255,140,66,0.4)',
-                                color: '#FF8C42',
-                                fontSize: '0.8rem',
-                              }}
-                            >
-                              {svc.category}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <Link
-                              to="/compare"
-                              className="small"
-                              style={{ color: '#FF8C42', textDecoration: 'none' }}
-                            >
-                              Compare
-                            </Link>
-                          </td>
-                        </tr>
-                      ))}
-                      {services.length === 0 && (
-                        <tr>
-                          <td colSpan={5} className="px-4 py-3 wt-text-muted small">
-                            No services listed for this shop.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-
-                {services.length === 0 && fallbackServiceTags.length > 0 && (
-                  <div className="mt-3">
-                    <p className="wt-text-muted small mb-2">
-                      Service highlights from the shop listing
-                    </p>
-                    <div className="d-flex flex-wrap gap-2">
-                      {fallbackServiceTags.map((service) => (
-                        <span key={service} className="wt-chip-service">
-                          {service}
-                        </span>
-                      ))}
+              <div className="wt-shop-map-frame">
+                <div ref={inlineMapHostRef} className="wt-shop-map-canvas" />
+                {mapStatus && (
+                  <div className="wt-shop-map-overlay">
+                    <div>
+                      <strong className="d-block mb-2">Map status</strong>
+                      <p className="mb-0">{mapStatus}</p>
                     </div>
                   </div>
                 )}
               </div>
-            )}
 
-            {activeTab === 'reviews' && (
-              <div className="d-flex flex-column gap-4">
-                <div>
-                  <div className="d-flex justify-content-between align-items-center mb-3">
-                    <div>
-                      <h3 className="h5 text-white mb-0">Customer Reviews</h3>
-                      <p className="wt-text-muted small mb-0">
-                        Only reviews with an approved receipt are marked as verified.
-                      </p>
-                    </div>
-                    <Link
-                      to={`/write-review?storeId=${shop.id}`}
-                      className="btn btn-sm btn-wt-outline"
+              <div className="wt-shop-map-meta">
+                <div className="wt-shop-map-meta-row">
+                  <span className="wt-shop-map-meta-label">Address</span>
+                  <strong>{displayAddress}</strong>
+                </div>
+                <div className="wt-shop-map-meta-row">
+                  <span className="wt-shop-map-meta-label">Coordinates</span>
+                  <strong>
+                    {hasCoordinates
+                      ? `${Number(resolvedCoords.lat).toFixed(5)}, ${Number(resolvedCoords.lng).toFixed(5)}`
+                      : 'Not available'}
+                  </strong>
+                </div>
+                <div className="wt-shop-map-meta-actions">
+                  {directionsUrl ? (
+                    <a
+                      href={directionsUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="btn btn-sm btn-wt-primary"
                     >
-                      Write Review
-                    </Link>
-                  </div>
-                  <div className="d-flex flex-column gap-3">
-                    {customerReviews.map((rev) => (
-                      <ReviewCard key={rev.id} {...rev} />
-                    ))}
-                    {customerReviews.length === 0 && (
-                      <p className="wt-text-muted small mb-0">No reviews yet.</p>
-                    )}
-                  </div>
+                      Open Directions
+                    </a>
+                  ) : (
+                    <button type="button" className="btn btn-sm btn-wt-primary" disabled>
+                      Open Directions
+                    </button>
+                  )}
+                </div>
+              </div>
+            </aside>
+          </div>
+        </div>
+
+        {error && (
+          <div className="wt-shop-inline-note">
+            {error}
+          </div>
+        )}
+
+        <div className="wt-shop-overview-grid">
+          <section className="wt-shop-section-card">
+            <div className="wt-shop-panel-heading">
+              <div>
+                <span className="wt-home-section-label">Overview</span>
+                <h2>About this shop</h2>
+              </div>
+            </div>
+
+            <p className="wt-text-muted mb-0">{aboutText}</p>
+
+            {serviceHighlights.length > 0 && (
+              <div className="mt-4">
+                <h3 className="wt-shop-subheading">Service highlights</h3>
+                <div className="d-flex flex-wrap gap-2">
+                  {serviceHighlights.map((service) => (
+                    <span key={service} className="wt-chip-service">
+                      {service}
+                    </span>
+                  ))}
                 </div>
               </div>
             )}
+          </section>
+
+          <section className="wt-shop-section-card">
+            <div className="wt-shop-panel-heading">
+              <div>
+                <span className="wt-home-section-label">Visit</span>
+                <h2>Contact &amp; access</h2>
+              </div>
+            </div>
+
+            <div className="wt-shop-info-list">
+              <div className="wt-shop-info-row">
+                <LuMapPin size={18} />
+                <div>
+                  <span className="wt-shop-subtle-label">Address</span>
+                  <strong>{displayAddress}</strong>
+                </div>
+              </div>
+              <div className="wt-shop-info-row">
+                <LuPhone size={18} />
+                <div>
+                  <span className="wt-shop-subtle-label">Phone</span>
+                  <strong>{shop.phone ?? 'Phone unavailable'}</strong>
+                </div>
+              </div>
+              <div className="wt-shop-info-row">
+                <LuClock size={18} />
+                <div>
+                  <span className="wt-shop-subtle-label">Hours status</span>
+                  <strong>{hoursRows.length > 0 ? 'Business hours listed' : 'Business hours unavailable'}</strong>
+                </div>
+              </div>
+            </div>
+
+            <div className="wt-shop-utility-links">
+              {websiteUrl ? (
+                <a href={websiteUrl} target="_blank" rel="noreferrer" className="btn btn-wt-outline">
+                  Visit Website
+                </a>
+              ) : (
+                <button type="button" className="btn btn-wt-outline" disabled>
+                  Website unavailable
+                </button>
+              )}
+
+              {directionsUrl ? (
+                <a href={directionsUrl} target="_blank" rel="noreferrer" className="btn btn-wt-primary">
+                  Launch Map Directions
+                </a>
+              ) : (
+                <button type="button" className="btn btn-wt-primary" disabled>
+                  Launch Map Directions
+                </button>
+              )}
+            </div>
+          </section>
+
+          <section className="wt-shop-section-card">
+            <div className="wt-shop-panel-heading">
+              <div>
+                <span className="wt-home-section-label">Schedule</span>
+                <h2>Hours &amp; availability</h2>
+              </div>
+            </div>
+
+            {hoursRows.length > 0 ? (
+              <div className="wt-shop-hours-list">
+                {hoursRows.map((item) => (
+                  <div key={item.day} className="wt-shop-hours-row">
+                    <span>{item.day}</span>
+                    <strong>{item.value}</strong>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="wt-text-muted mb-0">
+                Call {shop.name} to confirm today&apos;s hours and booking windows while the weekly schedule is still being filled in.
+              </p>
+            )}
+          </section>
+        </div>
+
+        <section className="wt-shop-section-card">
+          <div className="wt-shop-panel-heading">
+            <div>
+              <span className="wt-home-section-label">Services</span>
+              <h2>Services &amp; pricing</h2>
+            </div>
+            <Link to="/compare" className="wt-shop-inline-link">
+              Compare prices <LuArrowRight size={16} />
+            </Link>
+          </div>
+
+          <div className="wt-shop-table-shell">
+            <table className="wt-shop-data-table">
+              <thead>
+                <tr>
+                  <th>Service</th>
+                  <th>Price</th>
+                  <th>Duration</th>
+                  <th>Category</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {services.map((service) => (
+                  <tr key={service.id}>
+                    <td>{service.name}</td>
+                    <td>{typeof service.price === 'number' ? `$${service.price}` : 'Call'}</td>
+                    <td>{service.duration ?? 'Unknown'}</td>
+                    <td>
+                      <span className="wt-shop-category-chip">{service.category}</span>
+                    </td>
+                    <td>
+                      <Link to="/compare" className="wt-shop-inline-link">
+                        Compare
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+                {services.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="wt-text-muted">
+                      {shop.name} has not published a structured service menu yet, but the shop can still be reviewed through its location, contact details, and customer feedback above.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section className="wt-shop-section-card">
+          <div className="wt-shop-reviews-grid">
+            <aside className="wt-shop-review-summary">
+              <span className="wt-home-section-label">Reviews</span>
+              <h2>Customer trust snapshot</h2>
+              <div className="wt-shop-rating-row mb-3">
+                <div className="d-flex align-items-center gap-1">
+                  {Array.from({ length: 5 }).map((_, index) => (
+                    <LuStar
+                      key={`summary-star-${index}`}
+                      size={18}
+                      style={
+                        index < fullStars
+                          ? { color: 'var(--wt-warning)', fill: 'var(--wt-warning)' }
+                          : { color: 'var(--wt-border-strong)' }
+                      }
+                    />
+                  ))}
+                </div>
+                <strong>{averageRatingLabel}</strong>
+              </div>
+              <p className="wt-text-muted">
+                Only reviews with approved receipt evidence are marked as verified. That gives the
+                rating context instead of leaving it as anonymous star noise.
+              </p>
+              <Link to={`/write-review?storeId=${shop.id}`} className="btn btn-wt-outline">
+                Write Review
+              </Link>
+            </aside>
+
+            <div className="d-flex flex-column gap-3">
+              {customerReviews.map((review) => (
+                <ReviewCard key={review.id} {...review} />
+              ))}
+              {customerReviews.length === 0 && (
+                <p className="wt-text-muted mb-0">{shop.name} has not picked up customer reviews on this profile yet.</p>
+              )}
+            </div>
+          </div>
+        </section>
+      </section>
+
+      {isMapExpanded && (
+        <div className="wt-shop-map-modal" role="dialog" aria-modal="true" aria-label={`${shop.name} map`}>
+          <div className="wt-shop-map-modal-backdrop" onClick={() => setIsMapExpanded(false)} />
+          <div className="wt-shop-map-modal-panel">
+            <div className="wt-shop-map-modal-toolbar">
+              <div>
+                <span className="wt-home-section-label">Expanded Map</span>
+                <h2>{shop.name}</h2>
+              </div>
+              <button
+                type="button"
+                className="wt-shop-map-close"
+                onClick={() => setIsMapExpanded(false)}
+                aria-label="Close expanded map"
+              >
+                <LuX size={18} />
+              </button>
+            </div>
+
+            <div className="wt-shop-map-modal-frame">
+              <div ref={expandedMapHostRef} className="wt-shop-map-modal-canvas" />
+              {mapStatus && (
+                <div className="wt-shop-map-overlay">
+                  <div>
+                    <strong className="d-block mb-2">Map status</strong>
+                    <p className="mb-0">{mapStatus}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="wt-shop-map-modal-footer">
+              <div>
+                <span className="wt-shop-subtle-label">Address</span>
+                <strong>{displayAddress}</strong>
+              </div>
+              {directionsUrl ? (
+                <a href={directionsUrl} target="_blank" rel="noreferrer" className="btn btn-wt-primary">
+                  Open in Google Maps
+                </a>
+              ) : (
+                <button type="button" className="btn btn-wt-primary" disabled>
+                  Open in Google Maps
+                </button>
+              )}
+            </div>
           </div>
         </div>
-      </section>
+      )}
     </>
   );
 }
