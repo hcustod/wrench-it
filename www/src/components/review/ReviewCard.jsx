@@ -27,6 +27,7 @@ export default function ReviewCard({
   verificationStatus,
   date,
 }) {
+  // Round for display so half-step math from APIs does not produce awkward star fills in the card UI.
   const fullStars = Math.round(rating ?? 0);
   const verification = VERIFICATION_CONFIG[verificationStatus] ?? null;
   const VerificationIcon = verification?.Icon;

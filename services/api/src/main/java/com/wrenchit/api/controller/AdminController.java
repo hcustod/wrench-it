@@ -84,6 +84,7 @@ public class AdminController {
     public Map<String, Object> decidePendingReceipt(@PathVariable UUID id,
                                                     @AuthenticationPrincipal Jwt jwt,
                                                     @Validated @RequestBody ReceiptDecisionRequest request) {
+        // Keep the legacy route alive so older admin screens do not break while the UI converges on one endpoint.
         var user = userService.requireAppRole(jwt, "ADMIN");
         return portalDataService.decideReceipt(id, user.getId(), request.result, request.notes);
     }

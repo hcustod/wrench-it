@@ -32,6 +32,7 @@ public class StoreCatalogController {
     public Map<String, Object> compareByService(@RequestParam("service") String service) {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("service", service);
+        // Return the requested label alongside the results so the frontend can echo the compare context directly.
         out.put("stores", portalDataService.compareByService(service));
         return out;
     }

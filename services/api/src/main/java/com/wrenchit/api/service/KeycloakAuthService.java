@@ -106,6 +106,7 @@ public class KeycloakAuthService {
             userId = createKeycloakUser(adminToken, email, password, displayName);
             assignRealmRole(adminToken, userId, keycloakUserRole);
             if (!keycloakUserRole.equalsIgnoreCase(appRole)) {
+                // Keep the shared app role, then layer the portal-specific role on top when needed.
                 assignRealmRole(adminToken, userId, appRole);
             }
             userService.upsertRegisteredUser(
@@ -121,6 +122,7 @@ public class KeycloakAuthService {
             );
         } catch (RuntimeException ex) {
             if (userId != null) {
+                // Roll back the Keycloak record if the local profile write fails halfway through registration.
                 rollbackKeycloakUserQuietly(adminToken, userId);
             }
             throw ex;
@@ -327,6 +329,7 @@ public class KeycloakAuthService {
     private Optional<String> extractUserIdFromLocation(HttpResponse<String> response) {
         return response.headers().firstValue("Location")
                 .flatMap(location -> {
+                    // Keycloak usually returns the new user id in the Location header, which saves a second lookup.
                     int idx = location.lastIndexOf('/');
                     if (idx < 0 || idx == location.length() - 1) {
                         return Optional.empty();
@@ -415,6 +418,7 @@ public class KeycloakAuthService {
             Thread.currentThread().interrupt();
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Keycloak request interrupted.");
         } catch (IOException ex) {
+            // Surface a clean gateway-style error instead of leaking low-level HTTP client details.
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Unable to reach Keycloak.");
         }
     }
@@ -513,6 +517,7 @@ public class KeycloakAuthService {
         String shopName = normalizeOptional(request.shopName);
         String businessLicense = normalizeOptional(request.businessLicense);
 
+        // Mechanic and shop-owner accounts need a little more profile data because the portal surfaces it later.
         boolean proRole = "MECHANIC".equals(appRole) || "SHOP_OWNER".equals(appRole);
         if (proRole && phone == null) {
             throw new ResponseStatusException(

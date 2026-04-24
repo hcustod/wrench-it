@@ -65,6 +65,7 @@ export default function UserDashboardPage() {
           canReview: Boolean(item.canReview),
         }));
 
+        // Normalize the dashboard payload once here so the tab views can stay presentation-only.
         const reviewItems = (response?.reviews ?? []).map((item) => ({
           id: item.id,
           storeId: item.storeId,
@@ -145,6 +146,7 @@ export default function UserDashboardPage() {
     [workOrders],
   );
   const closedWorkOrders = useMemo(
+    // Keep completed/declined jobs separate so the active list stays useful at a glance.
     () => workOrders.filter((item) => isClosedStatus(item.status)),
     [workOrders],
   );

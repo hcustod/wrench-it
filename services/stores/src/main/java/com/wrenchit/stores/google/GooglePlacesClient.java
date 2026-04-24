@@ -65,6 +65,7 @@ public class GooglePlacesClient implements PlacesClient {
             r.setRating(item.rating);
             r.setRatingCount(item.user_ratings_total);
             results.add(r);
+            // Stop early here because the upstream response can be larger than the page we actually need.
             if (results.size() >= limit) {
                 break;
             }
@@ -114,6 +115,7 @@ public class GooglePlacesClient implements PlacesClient {
             details.setLat(item.geometry.location.lat);
             details.setLng(item.geometry.location.lng);
         }
+        // We only pull the fields the app currently renders to keep the details request cheap.
         details.setRating(item.rating);
         details.setRatingCount(item.user_ratings_total);
         return details;

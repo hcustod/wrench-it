@@ -7,6 +7,7 @@ function toIsoFromLocal(value) {
   if (!value) return '';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
+  // Send a full ISO timestamp so the backend can store one consistent format.
   return date.toISOString();
 }
 
@@ -103,6 +104,7 @@ export default function RequestWorkOrderPage() {
       });
       setCreatedWorkOrder(created ?? null);
       setSuccess('Work order request submitted to the shop.');
+      // Leave the selected shop/service in place so the user still has context after submit.
       setCustomerNotes('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create work order.');

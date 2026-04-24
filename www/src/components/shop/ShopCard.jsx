@@ -10,6 +10,7 @@ export default function ShopCard({
   services = [],
   hasVerifiedMechanic = false,
 }) {
+  // Keep the card compact on search results by only surfacing the first few service tags.
   const topServices = services.slice(0, 3);
 
   return (

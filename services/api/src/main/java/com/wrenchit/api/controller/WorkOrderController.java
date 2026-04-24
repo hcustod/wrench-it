@@ -47,6 +47,7 @@ public class WorkOrderController {
     public List<Map<String, Object>> reviewable(@AuthenticationPrincipal Jwt jwt,
                                                 @RequestParam(name = "storeId", required = false) UUID storeId) {
         var user = userService.getOrCreateFromJwt(jwt);
+        // The optional store filter keeps the review flow focused when the user starts from a specific shop page.
         return portalDataService.listReviewableWorkOrders(user.getId(), storeId);
     }
 }

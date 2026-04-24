@@ -29,6 +29,7 @@ public class ReceiptFileResponseFactory {
                 .build();
 
         return ResponseEntity.ok()
+                // Inline makes PDFs/images preview in-browser, while still preserving the original filename.
                 .contentType(mediaType)
                 .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
                 .body(new FileSystemResource(file.path()));

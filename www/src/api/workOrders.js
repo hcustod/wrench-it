@@ -7,6 +7,7 @@ export function createWorkOrder(payload) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
+      // Keep optional vehicle fields present so the backend gets a consistent request shape.
       storeId: payload.storeId,
       serviceId: payload.serviceId,
       scheduledFor: payload.scheduledFor,

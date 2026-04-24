@@ -71,6 +71,7 @@ public class PortalDataService {
             return (UUID) mapped.get("store_id");
         }
 
+        // Some owner accounts exist before a shop record is linked, so create that relationship lazily.
         Map<String, Object> userRow = querySingleMap(
                 """
                 select
@@ -191,6 +192,7 @@ public class PortalDataService {
                 normalizeOptional(nextAddress),
                 normalizeOptional(Objects.toString(current.get("address"), null))
         );
+        // If the address changed, clear the old coordinates until the updated location is reviewed again.
         Double nextLat = addressChanged ? null : asDouble(current.get("lat"));
         Double nextLng = addressChanged ? null : asDouble(current.get("lng"));
 
@@ -234,6 +236,7 @@ public class PortalDataService {
                         .addValue("name", nextName)
                         .addValue("address", nextAddress)
                         .addValue("phone", nextPhone)
+                        // Editing a rejected profile should send it back through approval automatically.
                         .addValue("resubmitForApproval", "REJECTED".equalsIgnoreCase(approvalStatus))
                         .addValue("lat", nextLat)
                         .addValue("lng", nextLng)
@@ -2135,6 +2138,7 @@ public class PortalDataService {
             return new LinkedHashMap<>();
         }
         try {
+            // Bad hours data should not break the whole profile response.
             return objectMapper.readValue(json, new TypeReference<>() {
             });
         } catch (JsonProcessingException ex) {
@@ -2147,6 +2151,7 @@ public class PortalDataService {
         for (Map.Entry<String, ShopProfileUpdateRequest.ShopHoursWindow> entry : source.entrySet()) {
             ShopProfileUpdateRequest.ShopHoursWindow value = entry.getValue();
             Map<String, Object> row = new LinkedHashMap<>();
+            // Keep the stored shape close to the request payload so the frontend can round-trip it cleanly.
             row.put("open", value == null ? null : normalizeOptional(value.open));
             row.put("close", value == null ? null : normalizeOptional(value.close));
             out.put(entry.getKey(), row);

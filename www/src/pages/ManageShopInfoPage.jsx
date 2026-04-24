@@ -48,6 +48,7 @@ function buildHours(source) {
 
   DAY_ORDER.forEach((day) => {
     const sourceWindow = source?.[day] ?? {};
+    // Fill missing days with sensible defaults so the form always renders a complete weekly schedule.
     out[day] = {
       open:
         typeof sourceWindow.open === 'string' && sourceWindow.open.trim()
@@ -104,6 +105,7 @@ async function loadGoogleMaps(apiKey) {
   if (!apiKey) throw new Error('Google Maps API key is missing.');
 
   if (!window.__wrenchitGoogleMapsLoader) {
+    // Reuse the shared loader so owner screens behave the same as the public map pages.
     window.__wrenchitGoogleMapsLoader = new Promise((resolve, reject) => {
       const script = document.createElement('script');
       script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}`;
@@ -249,6 +251,7 @@ export default function ManageShopInfoPage() {
     setForm((prev) => ({
       ...prev,
       hours: {
+        // Toggling back restores the default window for that day instead of leaving it blank.
         ...prev.hours,
         [day]: isClosed ? { ...DEFAULT_HOURS[day] } : { open: 'Closed', close: '' },
       },

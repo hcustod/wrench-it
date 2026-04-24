@@ -42,6 +42,7 @@ public class ClamAvService {
         try {
             scanStrict(fileBytes);
         } catch (ResponseStatusException ex) {
+            // In fail-open mode, scanner outages should warn but not block every upload.
             if (ex.getStatusCode().value() == BAD_REQUEST.value() || failClosed) {
                 throw ex;
             }
@@ -60,6 +61,7 @@ public class ClamAvService {
 
                 int offset = 0;
                 while (offset < fileBytes.length) {
+                    // ClamAV expects the stream to be framed as chunk-length + bytes until a zero-length terminator.
                     int chunkLength = Math.min(8192, fileBytes.length - offset);
                     writeChunkLength(output, chunkLength);
                     output.write(fileBytes, offset, chunkLength);

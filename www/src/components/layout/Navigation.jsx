@@ -19,6 +19,7 @@ export default function Navigation() {
           <Link
             to="/search"
             className={`d-flex align-items-center gap-2 ${
+              // Keep the top-level nav highlight simple until more route groups need to map back here.
               location.pathname === '/search' ? 'wt-link-nav-active' : 'wt-link-nav'
             }`}
           >
@@ -46,4 +47,3 @@ export default function Navigation() {
     </nav>
   );
 }
-

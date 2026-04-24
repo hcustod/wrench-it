@@ -52,6 +52,7 @@ function toUpsertPayload(service) {
   const parsedPrice = Number(service.price);
   return {
     name: service.name.trim(),
+    // Let the API own the final money validation, but avoid sending NaN from the form.
     price: Number.isFinite(parsedPrice) ? parsedPrice : 0,
     duration: service.duration === '—' ? '' : service.duration,
     category: service.category,
@@ -105,6 +106,7 @@ export default function ManageServicesPage() {
 
     try {
       await deleteMyShopService(id);
+      // Update the table in place so owners get immediate feedback without a full reload.
       setServices((prev) => prev.filter((s) => s.id !== id));
       if (editingId === id) setEditingId(null);
     } catch (err) {
@@ -144,6 +146,7 @@ export default function ManageServicesPage() {
 
   function handleUpdateService(id, field, value) {
     setServices((prev) =>
+      // Keep edits local until save so users can back out or fix multiple fields before the request.
       prev.map((s) => (s.id === id ? { ...s, [field]: value } : s))
     );
   }

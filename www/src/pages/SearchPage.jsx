@@ -103,6 +103,7 @@ async function loadGoogleMaps(apiKey) {
   if (!apiKey) throw new Error('Google Maps API key is missing.');
 
   if (!window.__wrenchitGoogleMapsLoader) {
+    // Reuse a single loader promise so repeated page visits do not inject the script twice.
     window.__wrenchitGoogleMapsLoader = new Promise((resolve, reject) => {
       const script = document.createElement('script');
       script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}`;
@@ -233,6 +234,7 @@ export default function SearchPage() {
           && qLocation
           && qLocation.toLowerCase() !== 'current location';
         const { city: cityParam, state: stateParam } = parseLocationFilters(qLocation);
+        // If the location looks like plain text instead of city/state filters, let the backend search against it directly.
         const qParam = qService.trim() || (shouldUseLocationText && !cityParam && !stateParam
           ? qLocation
           : '');
@@ -394,6 +396,7 @@ export default function SearchPage() {
       markerCount += 1;
     });
 
+    // Fit to whichever markers are available so the map still feels useful for both broad and local searches.
     if (markerCount > 0 || userCoords) {
       mapRef.current.fitBounds(bounds);
       if (markerCount === 1 && !userCoords) {

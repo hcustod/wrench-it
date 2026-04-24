@@ -51,6 +51,7 @@ async function loadGoogleMaps(apiKey) {
   if (!apiKey) throw new Error('Google Maps API key is missing.');
 
   if (!window.__wrenchitGoogleMapsLoader) {
+    // Share the loader across pages so profile/search views do not race to add duplicate scripts.
     window.__wrenchitGoogleMapsLoader = new Promise((resolve, reject) => {
       const script = document.createElement('script');
       script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}`;
@@ -100,6 +101,7 @@ export default function ShopProfilePage() {
         setShop(normalizeStore(storeRes));
         setServices(servicesRes ?? []);
 
+        // Normalize review shape here so the card component can stay dumb and presentation-focused.
         const apiReviews = (reviewsRes ?? []).map((rev) => ({
           id: rev.id,
           reviewerName:
@@ -200,6 +202,7 @@ export default function ShopProfilePage() {
         if (shop?.lat != null && shop?.lng != null) {
           center = { lat: Number(shop.lat), lng: Number(shop.lng) };
         } else {
+          // Older or imported shops may only have an address, so geocode on the fly for the profile map.
           const address = [shop?.address, shop?.city, shop?.state, shop?.postalCode, shop?.country]
             .filter(Boolean)
             .join(', ');
@@ -298,6 +301,7 @@ export default function ShopProfilePage() {
   const dialPhone = typeof shop.phone === 'string'
     ? shop.phone.replace(/[^\d+]/g, '')
     : '';
+  // Prefer coordinates when we have them so directions land on the map pin instead of a fuzzy text match.
   const directionsTarget = hasCoordinates
     ? `${resolvedCoords.lat},${resolvedCoords.lng}`
     : [shop.address, shop.city, shop.state, shop.postalCode].filter(Boolean).join(', ');

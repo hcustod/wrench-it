@@ -11,6 +11,7 @@ public class StoresConfig {
 
     @Bean
     RestClient googlePlacesRestClient(RestClient.Builder builder, GooglePlacesProperties props) {
+        // Centralize the base URL so the real and test Google clients share the same wiring point.
         return builder.baseUrl(props.getBaseUrl()).build();
     }
 }

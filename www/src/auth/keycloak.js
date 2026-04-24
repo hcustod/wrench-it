@@ -72,6 +72,7 @@ export async function getCurrentUser() {
   let payload = await parseJsonSafe(response);
 
   if (response.status === 401) {
+    // Give an expired session one quiet refresh attempt before treating it as a real logout.
     await refreshSession();
     response = await requestMe();
     payload = await parseJsonSafe(response);
@@ -93,6 +94,7 @@ export async function beginLogin(options = {}) {
     'Unable to sign in.'
   );
 
+  // Read the role back from the server instead of trusting the login form state.
   const me = await getCurrentUser();
   return { returnTo: routeForRole(me?.role) };
 }

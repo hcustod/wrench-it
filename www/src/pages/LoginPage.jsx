@@ -36,6 +36,7 @@ export default function LoginPage() {
     setResetting(true);
     try {
       const payload = await beginPasswordReset({ email });
+      // Mirror the backend's generic reset response so we do not hint whether the email is registered.
       setMessage(
         typeof payload?.message === 'string' && payload.message.trim()
           ? payload.message

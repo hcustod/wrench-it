@@ -57,6 +57,7 @@ public class UserService {
                 .map(existing -> {
                     boolean dirty = false;
 
+                    // Keep the local profile in sync with the latest token claims without forcing a separate profile refresh.
                     if (!Objects.equals(normalizeOptional(existing.getEmail()), email)) {
                         existing.setEmail(email);
                         dirty = true;
@@ -157,6 +158,7 @@ public class UserService {
             return seeded.get();
         }
 
+        // Fall back to a predictable local user when auth is disabled and the seeded demo account is absent.
         return userRepository.findByKeycloakSub(LOCAL_DEV_SUB)
                 .orElseGet(() -> {
                     User u = new User();
@@ -225,6 +227,7 @@ public class UserService {
                 continue;
             }
             String normalized = normalizeRole(roleText);
+            // Pick the highest-privilege app role we recognize from the realm roles list.
             if ("ADMIN".equals(normalized)) {
                 return "ADMIN";
             }

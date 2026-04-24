@@ -55,6 +55,7 @@ export default function WriteReviewPage() {
         setShop(storeRes);
         setWorkOrders(reviewableWorkOrders ?? []);
 
+        // If the page was opened from a specific job, keep that visit selected when it is still reviewable.
         const nextSelected =
           (reviewableWorkOrders ?? []).find((item) => item.id === preselectedWorkOrderId)?.id
           || reviewableWorkOrders?.[0]?.id
@@ -111,6 +112,7 @@ export default function WriteReviewPage() {
       let receiptId;
 
       if (receiptFile) {
+        // Upload the receipt first so the review can point at the stored file in one submit flow.
         const receipt = await createReceipt({
           file: receiptFile,
           storeId: selectedWorkOrder.storeId,
@@ -127,6 +129,7 @@ export default function WriteReviewPage() {
         receiptId,
       });
 
+      // Remove the visit locally after submit so users do not accidentally review the same work order twice.
       const remainingWorkOrders = workOrders.filter((item) => item.id !== selectedWorkOrder.id);
       setSuccess('Review submitted for verification.');
       setRating(0);
